@@ -34,7 +34,7 @@ jobs:
           git fetch origin main
           git checkout -B main origin/main
 
-          version="$(node scripts/bump-version.js)"
+          version="$(node updates/bump-version.cjs)"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add build/config.yml build/windows/info.json build/linux/nfpm/nfpm.yaml frontend/package.json frontend/package-lock.json
@@ -143,6 +143,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
+          (cd release-assets && sha256sum *.exe *.deb > SHA256SUMS)
           gh release create "v${VERSION}" release-assets/* \
             --repo "${GITHUB_REPOSITORY}" \
             --title "DepManager v${VERSION}" \

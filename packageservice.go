@@ -38,6 +38,8 @@ type PackageActionResult struct {
 }
 
 type PackageService struct {
+	operations   *sync.RWMutex
+	emitProgress func(PackageActionProgress)
 }
 
 type latestVersionCacheEntry struct {
@@ -118,6 +120,12 @@ func (s *PackageService) GetLatestPackageVersion(manager, packageName string) st
 
 // RunPackageAction updates a global package to its latest version or removes it.
 func (s *PackageService) RunPackageAction(manager, packageName, action string) PackageActionResult {
+	if s.operations != nil {
+		if !s.operations.TryRLock() {
+			return PackageActionResult{Message: "DepManager is updating. Wait for the application to restart."}
+		}
+		defer s.operations.RUnlock()
+	}
 	manager = strings.ToLower(strings.TrimSpace(manager))
 	packageName = strings.TrimSpace(packageName)
 	if !isValidPackageName(packageName) {
@@ -129,28 +137,45 @@ func (s *PackageService) RunPackageAction(manager, packageName, action string) P
 	if !isSupportedManager(manager) {
 		return PackageActionResult{Message: "That package manager is not supported."}
 	}
+	progress := func(stage string) {
+		if s.emitProgress != nil {
+			s.emitProgress(PackageActionProgress{Manager: manager, PackageName: packageName, Action: action, Stage: stage})
+		}
+	}
+	progress("Preparing")
 	if _, err := exec.LookPath(manager); err != nil {
 		return PackageActionResult{Message: manager + " is no longer available on PATH."}
 	}
 
 	args := packageActionArgs(manager, packageName, action)
-	output, stderr, err := runPackageManager(manager, 10*time.Minute, args...)
+	stage := "Updating"
+	if action == "remove" {
+		stage = "Removing"
+	} else if manager == "npm" {
+		stage = "Installing"
+	}
+	progress(stage)
+	// Ask for readable progress even when the CLI is connected to a pipe.
+	if manager == "npm" {
+		args = append(args, "--loglevel=http")
+	} else if manager == "pnpm" {
+		args = append(args, "--reporter=append-only")
+	}
+	output, stderr, err := runPackageManagerWithProgress(manager, 10*time.Minute, progress, args...)
 	combined := strings.TrimSpace(string(output) + "\n" + string(stderr))
 	if err != nil {
 		message := fmt.Sprintf("Could not %s %s with %s: %s", action, packageName, manager, err)
-		if combined != "" {
-			message += "\n" + truncate(combined, 6000)
-		}
 		return PackageActionResult{Message: message, Output: truncate(combined, 6000)}
 	}
+	latestVersionCache.Delete(manager + ":" + packageName)
 
 	verb := "Updated"
 	if action == "remove" {
 		verb = "Removed"
 	}
 	message := fmt.Sprintf("%s %s with %s.", verb, packageName, manager)
-	if combined != "" {
-		message += "\n" + truncate(combined, 3000)
+	if action == "update" && manager == "bun" && strings.Contains(combined, "(no changes)") {
+		message = fmt.Sprintf("No changes to %s with %s.", packageName, manager)
 	}
 	return PackageActionResult{Success: true, Message: message, Output: truncate(combined, 6000)}
 }
@@ -204,7 +229,8 @@ func latestVersionArgs(manager, packageName string) []string {
 	case "npm", "pnpm":
 		return []string{"view", spec, "version", "--json"}
 	case "bun":
-		return []string{"pm", "view", spec, "version", "--json"}
+		// Without --global, Bun requires a package.json in the app's working directory.
+		return []string{"pm", "--global", "view", spec, "version", "--json"}
 	default:
 		return nil
 	}
@@ -237,6 +263,7 @@ func listGlobalPackages(manager string) ([]GlobalPackage, error) {
 		stdout, stderr, err := runPackageManager(manager, 30*time.Second, "ls", "--global", "--depth=0", "--json")
 		packages, parseErr := parseJSONGlobalPackages(stdout)
 		if parseErr == nil {
+			fillMissingPackageVersions(manager, packages)
 			return packages, nil // npm can return exit status 1 and valid JSON for extraneous packages.
 		}
 		return nil, commandOrParseError(err, stderr, parseErr)
@@ -244,6 +271,7 @@ func listGlobalPackages(manager string) ([]GlobalPackage, error) {
 		stdout, stderr, err := runPackageManager(manager, 30*time.Second, "ls", "--global", "--depth=0", "--json")
 		packages, parseErr := parseJSONGlobalPackages(stdout)
 		if parseErr == nil {
+			fillMissingPackageVersions(manager, packages)
 			return packages, nil
 		}
 		return nil, commandOrParseError(err, stderr, parseErr)
@@ -251,6 +279,34 @@ func listGlobalPackages(manager string) ([]GlobalPackage, error) {
 		return listBunGlobalPackages()
 	default:
 		return nil, errors.New("unsupported package manager")
+	}
+}
+
+// Some CLI package lists omit versions for linked or incomplete installs.
+// Only a local installed manifest can supply the actual installed version.
+func fillMissingPackageVersions(manager string, packages []GlobalPackage) {
+	for _, pkg := range packages {
+		if strings.TrimSpace(pkg.Version) == "" {
+			stdout, _, err := runPackageManager(manager, 8*time.Second, "root", "--global")
+			if err == nil {
+				fillPackageVersionsFromRoot(packages, strings.TrimSpace(string(stdout)))
+			}
+			return
+		}
+	}
+}
+
+func fillPackageVersionsFromRoot(packages []GlobalPackage, root string) {
+	if !filepath.IsAbs(root) {
+		return
+	}
+	for i := range packages {
+		if strings.TrimSpace(packages[i].Version) != "" || !isValidPackageName(packages[i].Name) {
+			continue
+		}
+		if installed, ok := readPackageManifest(filepath.Join(root, filepath.FromSlash(packages[i].Name), "package.json")); ok {
+			packages[i].Version = installed.Version
+		}
 	}
 }
 
@@ -472,6 +528,10 @@ func sortedPackages(packages []GlobalPackage) []GlobalPackage {
 }
 
 func runPackageManager(name string, timeout time.Duration, args ...string) ([]byte, []byte, error) {
+	return runPackageManagerWithProgress(name, timeout, nil, args...)
+}
+
+func runPackageManagerWithProgress(name string, timeout time.Duration, progress func(string), args ...string) ([]byte, []byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -485,13 +545,24 @@ func runPackageManager(name string, timeout time.Duration, args ...string) ([]by
 		command = exec.CommandContext(ctx, name, args...)
 	}
 	configurePackageCommand(command)
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	stdout, err := command.Output()
+	var stdout, stderr bytes.Buffer
+	if progress == nil {
+		command.Stdout = &stdout
+		command.Stderr = &stderr
+	} else {
+		reporter := &packageProgressReporter{emit: progress}
+		out := &packageProgressWriter{output: &stdout, reporter: reporter}
+		errOut := &packageProgressWriter{output: &stderr, reporter: reporter}
+		command.Stdout = out
+		command.Stderr = errOut
+		defer out.flush()
+		defer errOut.flush()
+	}
+	err := command.Run()
 	if ctx.Err() != nil {
 		err = ctx.Err()
 	}
-	return stdout, stderr.Bytes(), err
+	return stdout.Bytes(), stderr.Bytes(), err
 }
 
 func truncate(text string, max int) string {

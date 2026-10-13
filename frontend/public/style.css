@@ -58,6 +58,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8795eb; outline-
 .notice-success { border-color: #d5e8db; background: #f6fbf7; color: #386949; }
 .notice-error { border-color: #f0d9d6; background: #fff8f7; color: #9a4e45; }
 .notice button { margin: -3px 0 0 auto; padding: 0 3px; border: 0; background: none; color: inherit; font-size: 20px; cursor: pointer; }
+.notice-content { min-width: 0; flex: 1; }
+.notice details { margin-top: 7px; }
+.notice summary { cursor: pointer; --wails-draggable: no-drag; }
+.notice pre { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
 
 .packages-panel { margin-top: 26px; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: 0 8px 28px rgba(27, 35, 53, .035); }
 .packages-toolbar { min-height: 86px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 24px; border-bottom: 1px solid #eceef2; }
@@ -81,6 +85,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8795eb; outline-
 .package-name { overflow: hidden; color: #303744; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .package-manager { display: inline-flex; align-items: center; gap: 9px; color: #697382; font-size: 12px; }
 .package-version { color: #626d7b; font: 12px 'Cascadia Code', Consolas, monospace; }
+.package-version-missing { color: #98703a; font: 11px 'Segoe UI', sans-serif; }
 .row-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; white-space: nowrap; }
 .update-button, .delete-button { height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid; border-radius: 10px; cursor: pointer; transition: background .18s, border-color .18s, color .18s, transform .18s; }
 .update-button { min-width: 78px; padding: 0 13px; border-color: #dfe3fa; background: #f4f5ff; color: #4b5dc4; font-size: 11px; font-weight: 650; }
@@ -95,6 +100,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8795eb; outline-
 .empty-state { min-height: 210px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px; color: var(--muted); font-size: 13px; text-align: center; }
 .empty-state strong { color: #46505e; font-size: 14px; font-weight: 650; }
 .loading-spinner { width: 21px; height: 21px; margin-bottom: 5px; border: 2px solid #e9ebf5; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+.action-progress { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; color: var(--accent); font-size: 11px; font-weight: 650; }
+.action-spinner { width: 13px; height: 13px; margin-bottom: 0; flex: 0 0 auto; }
+.app-updates { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 24px; padding: 20px 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); --wails-draggable: no-drag; }
+.app-update-details { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.app-update-details strong { color: var(--text); font-size: 13px; }
+.app-update-details .app-update-error { color: #9a4e45; }
+.app-update-controls { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 12px; }
+.auto-update-option { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+.auto-update-option input { accent-color: var(--accent); }
+.app-update-buttons { display: flex; align-items: center; gap: 10px; }
+.app-update-buttons a { color: var(--accent); font-size: 12px; }
+.app-update-spinner { width: 15px; height: 15px; margin-bottom: 0; flex: 0 0 auto; }
 
 @media (max-width: 900px) {
   .page-content { padding: 34px 28px 60px; }
@@ -102,6 +119,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8795eb; outline-
 }
 
 @media (max-width: 640px) {
+  .app-updates { align-items: flex-start; flex-direction: column; padding: 18px; }
+  .app-update-controls { align-items: flex-start; }
   .page-content { padding: 24px 18px 48px; }
   .filter-section { padding: 18px; border-radius: 16px; }
   .filter-label { margin-bottom: 12px; }
@@ -126,4 +145,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8795eb; outline-
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  /* Keep progress indicators moving while reducing their rotation speed. */
+  .spin, .loading-spinner { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
 }

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"depmanager/updates"
 	"embed"
+	"encoding/json"
 	"log"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -10,12 +13,25 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed frontend/package.json
+var appPackageJSON []byte
+
 func main() {
+	var manifest struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(appPackageJSON, &manifest); err != nil || manifest.Version == "" {
+		log.Fatal("application version is missing from frontend/package.json")
+	}
+	operations := &sync.RWMutex{}
+	packageService := &PackageService{operations: operations}
+	updateService := updates.New(manifest.Version, operations)
 	app := application.New(application.Options{
 		Name:        "DepManager",
 		Description: "Manage global JavaScript packages",
 		Services: []application.Service{
-			application.NewService(&PackageService{}),
+			application.NewService(packageService),
+			application.NewService(updateService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -24,6 +40,12 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+	packageService.emitProgress = func(progress PackageActionProgress) {
+		app.Event.Emit(packageProgressEvent, progress)
+	}
+	if err := updates.Configure(updateService, app.Updater, app.Quit); err != nil {
+		log.Fatal(err)
+	}
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "DepManager",

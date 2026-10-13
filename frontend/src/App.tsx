@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Events } from '@wailsio/runtime'
 import * as PackageService from '../bindings/depmanager/packageservice'
+import AppUpdates from './AppUpdates'
 
 type GlobalPackage = {
   name: string
@@ -17,7 +19,12 @@ type PackageManagerInfo = {
 type Notice = {
   kind: 'success' | 'error'
   message: string
+  output?: string
 }
+
+type PackageAction = 'update' | 'remove'
+type ActiveAction = { action: PackageAction, stage: string }
+type PackageProgress = { manager: string, packageName: string, action: PackageAction, stage: string }
 
 const managerNames = ['npm', 'pnpm', 'bun']
 
@@ -52,12 +59,23 @@ function App() {
   const [managers, setManagers] = useState<PackageManagerInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [appUpdating, setAppUpdating] = useState(false)
   const [search, setSearch] = useState('')
   const [activeManager, setActiveManager] = useState('all')
-  const [activeActions, setActiveActions] = useState<Record<string, 'update' | 'remove'>>({})
+  const [activeActions, setActiveActions] = useState<Record<string, ActiveAction>>({})
   const [latestVersions, setLatestVersions] = useState<Record<string, string | null | undefined>>({})
   const [notice, setNotice] = useState<Notice | null>(null)
   const latestCheckRun = useRef(0)
+
+  useEffect(() => Events.On('package:progress', (event) => {
+    const progress = event.data as PackageProgress
+    const key = `${progress.manager}:${progress.packageName}`
+    setActiveActions((current) => {
+      const active = current[key]
+      if (!active || active.action !== progress.action || active.stage === 'Refreshing') return current
+      return { ...current, [key]: { ...active, stage: progress.stage } }
+    })
+  }), [])
 
   const checkLatestVersions = useCallback(async (data: PackageManagerInfo[]) => {
     const packages = data.flatMap((manager) => manager.installed
@@ -113,17 +131,19 @@ function App() {
     const query = search.trim().toLowerCase()
     return allPackages.filter((pkg) => (activeManager === 'all' || pkg.manager === activeManager) && (!query || `${pkg.name} ${pkg.version} ${pkg.manager}`.toLowerCase().includes(query)))
   }, [activeManager, allPackages, search])
-  const runAction = async (manager: string, pkg: GlobalPackage, action: 'update' | 'remove') => {
+  const runAction = async (manager: string, pkg: GlobalPackage, action: PackageAction) => {
+    if (appUpdating) return
     if (action === 'remove' && !window.confirm(`Remove ${pkg.name} from ${manager}'s global packages?`)) return
     const key = `${manager}:${pkg.name}`
-    setActiveActions((current) => ({ ...current, [key]: action }))
+    setActiveActions((current) => ({ ...current, [key]: { action, stage: 'Preparing' } }))
     setNotice(null)
     try {
       const result = await PackageService.RunPackageAction(manager, pkg.name, action)
       if (!result.success) {
-        setNotice({ kind: 'error', message: result.message })
+        setNotice({ kind: 'error', message: result.message, output: result.output })
       } else {
-        setNotice({ kind: 'success', message: result.message })
+        setNotice({ kind: 'success', message: result.message, output: result.output })
+        setActiveActions((current) => ({ ...current, [key]: { action, stage: 'Refreshing' } }))
         await loadManagers()
       }
     } catch (error) {
@@ -178,7 +198,13 @@ function App() {
         {notice && (
           <div className={`notice notice-${notice.kind}`} role="status">
             <Icon name={notice.kind === 'success' ? 'check' : 'alert'} />
-            <span>{notice.message}</span>
+            <div className="notice-content">
+              <span>{notice.message}</span>
+              {notice.output && <details open={notice.kind === 'error'}>
+                <summary>Command output</summary>
+                <pre>{notice.output}</pre>
+              </details>}
+            </div>
             <button aria-label="Dismiss message" onClick={() => setNotice(null)}>×</button>
           </div>
         )}
@@ -187,14 +213,14 @@ function App() {
           <div className="packages-toolbar">
             <div>
               <h2>{activeManager === 'all' ? 'Packages' : `${activeManager} packages`}</h2>
-              <span>{loading ? 'Scanning…' : `${filteredPackages.length} shown`}</span>
+              <span>{loading ? 'Scanning' : `${filteredPackages.length} shown`}</span>
             </div>
             <div className="toolbar-actions">
               <label className="search-box">
                 <Icon name="search" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search packages" aria-label="Search packages" />
               </label>
-              <button className="refresh-button" onClick={() => void loadManagers()} disabled={refreshing}>
+              <button className="refresh-button" onClick={() => void loadManagers()} disabled={refreshing || appUpdating}>
                 <span className={refreshing ? 'spin' : ''}><Icon name="refresh" /></span>
                 <span>{refreshing ? 'Refreshing' : 'Refresh'}</span>
               </button>
@@ -205,7 +231,7 @@ function App() {
             <div className="table-heading" aria-hidden="true">
               <span>Package</span><span>Manager</span><span>Version</span><span className="actions-heading">Actions</span>
             </div>
-            {loading && <div className="empty-state"><span className="loading-spinner" />Scanning installed packages…</div>}
+            {loading && <div className="empty-state" role="status"><span className="loading-spinner" aria-hidden="true" />Scanning</div>}
             {!loading && filteredPackages.map((pkg) => {
               const key = `${pkg.manager}:${pkg.name}`
               const pendingAction = activeActions[key]
@@ -216,20 +242,26 @@ function App() {
                 <div className="package-row" key={key} aria-busy={Boolean(pendingAction)}>
                   <span className="package-name">{pkg.name}</span>
                   <span className="package-manager"><i className={`manager-dot manager-${pkg.manager}`} />{label}</span>
-                  <span className="package-version">{pkg.version || '—'}</span>
+                  <span className={`package-version ${!pkg.version ? 'package-version-missing' : ''}`} title={!pkg.version ? 'The installed version could not be read. Repair reinstalls the latest version.' : undefined}>{pkg.version || 'Incomplete install'}</span>
                   <div className="row-actions">
-                    {pendingAction === 'update' ? (
-                      <button className="update-button" disabled>Updating…</button>
+                    {pendingAction ? (
+                      <span className="action-progress" role="status" aria-label={`${pkg.name}: ${pendingAction.stage}`}>
+                        <span className="loading-spinner action-spinner" aria-hidden="true" />{pendingAction.stage}
+                      </span>
+                    ) : !pkg.version ? (
+                      <button className="update-button" onClick={() => void runAction(pkg.manager, pkg, 'update')} disabled={Boolean(pendingAction) || appUpdating}>Repair</button>
                     ) : latestVersion === undefined ? (
-                      <button className="update-button" disabled>Checking…</button>
+                      <button className="update-button" disabled>Checking</button>
+                    ) : latestVersion === null ? (
+                      <button className="update-button" title="Could not check the latest version. Retry the version check." onClick={() => void checkLatestVersions(managers)} disabled={appUpdating}>Retry</button>
                     ) : isLatest ? (
                       <span className="latest-status" title={`Latest version ${latestVersion}`}><Icon name="check" />Latest</span>
                     ) : (
-                      <button className="update-button" onClick={() => void runAction(pkg.manager, pkg, 'update')} disabled={Boolean(pendingAction)}>Update</button>
+                      <button className="update-button" onClick={() => void runAction(pkg.manager, pkg, 'update')} disabled={Boolean(pendingAction) || appUpdating}>Update</button>
                     )}
-                    <button className={`delete-button ${pendingAction === 'remove' ? 'is-removing' : ''}`} onClick={() => void runAction(pkg.manager, pkg, 'remove')} disabled={Boolean(pendingAction)} aria-label={pendingAction === 'remove' ? `Removing ${pkg.name}` : `Delete ${pkg.name}`} title={pendingAction === 'remove' ? 'Removing package' : 'Delete package'}>
-                      {pendingAction === 'remove' ? 'Removing…' : <Icon name="trash" />}
-                    </button>
+                    {!pendingAction && <button className="delete-button" onClick={() => void runAction(pkg.manager, pkg, 'remove')} disabled={appUpdating} aria-label={`Delete ${pkg.name}`} title="Delete package">
+                      <Icon name="trash" />
+                    </button>}
                   </div>
                 </div>
               )
@@ -242,6 +274,7 @@ function App() {
             )}
           </div>
         </section>
+        <AppUpdates packagesBusy={refreshing || Object.keys(activeActions).length > 0} onUpdating={setAppUpdating} />
       </div>
     </main>
   )
