@@ -484,6 +484,7 @@ func runPackageManager(name string, timeout time.Duration, args ...string) ([]by
 	} else {
 		command = exec.CommandContext(ctx, name, args...)
 	}
+	configurePackageCommand(command)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	stdout, err := command.Output()
