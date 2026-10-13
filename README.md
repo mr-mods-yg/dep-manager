@@ -2,6 +2,10 @@
 
 DepManager is a Wails desktop app for viewing global JavaScript packages installed by npm, pnpm, and Bun. It detects the package manager CLIs available on the current machine, shows each tool's version and global packages, and can update a package or remove it.
 
+## Screenshot
+
+![DepManager package manager view](images/image.png)
+
 ## Run locally
 
 Install Go, Node.js, and the Wails v3 CLI, then run:
