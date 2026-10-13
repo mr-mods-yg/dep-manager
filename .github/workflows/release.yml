@@ -1,0 +1,150 @@
+name: Build and release desktop apps
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-main
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      commit: ${{ steps.bump.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Bump patch version and tag the release
+        id: bump
+        shell: bash
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+
+          version="$(node scripts/bump-version.js)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build/config.yml build/windows/info.json build/linux/nfpm/nfpm.yaml frontend/package.json frontend/package-lock.json
+          git commit -m "chore(release): v${version} [skip ci]"
+          git tag "v${version}"
+          git push origin main "refs/tags/v${version}"
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-latest
+          - platform: linux
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.commit }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Install Wails CLI (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28
+          "$(go env GOPATH)\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install Wails CLI (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Install NSIS
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            choco install nsis --yes --no-progress
+          }
+          $nsisPath = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
+          if (Test-Path $nsisPath) {
+            $nsisPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+
+      - name: Build Windows installer
+        if: matrix.platform == 'windows'
+        run: wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=user
+
+      - name: Build Linux Debian package
+        if: matrix.platform == 'linux'
+        run: wails3 task linux:create:deb ARCH=amd64
+
+      - name: Upload Windows release asset
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: bin/*amd64-installer.exe
+          if-no-files-found: error
+
+      - name: Upload Linux release asset
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: bin/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          gh release create "v${VERSION}" release-assets/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "DepManager v${VERSION}" \
+            --generate-notes \
+            --verify-tag
