@@ -12,7 +12,7 @@ var assets embed.FS
 
 func main() {
 	app := application.New(application.Options{
-		Name:        "depdesk",
+		Name:        "DepManager",
 		Description: "Manage global JavaScript packages",
 		Services: []application.Service{
 			application.NewService(&PackageService{}),
@@ -26,7 +26,7 @@ func main() {
 	})
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "Depdesk - Global Packages Manager",
+		Title:  "DepManager",
 		Width:  1220,
 		Height: 820,
 		Mac: application.MacWindow{

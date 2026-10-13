@@ -5,11 +5,11 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "depdesk" # The name of the company
-  productName: "depdesk" # The name of the application
-  productIdentifier: "com.depdesk.app" # The unique product identifier
+  companyName: "DepManager" # The name of the company
+  productName: "DepManager" # The name of the application
+  productIdentifier: "com.depmanager.app" # The unique product identifier
   description: "Manage global JavaScript packages" # The application description
-  copyright: "(c) 2026 depdesk" # Copyright text
+  copyright: "(c) 2026 DepManager" # Copyright text
   comments: "Global package manager" # Comments
   version: "1.0.0" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)

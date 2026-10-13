@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import * as PackageService from '../bindings/depdesk/packageservice'
+import * as PackageService from '../bindings/depmanager/packageservice'
 
 type GlobalPackage = {
   name: string

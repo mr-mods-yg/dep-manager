@@ -8,14 +8,14 @@
   IgnorableNamespaces="uap3">
   
   <Identity 
-    Name="com.depdesk.app"
-    Publisher="CN=depdesk"
+    Name="com.depmanager.app"
+    Publisher="CN=DepManager"
     Version="1.0.0.0" 
     ProcessorArchitecture="x64" />
   
   <Properties>
-    <DisplayName>depdesk</DisplayName>
-    <PublisherDisplayName>depdesk</PublisherDisplayName>
+    <DisplayName>DepManager</DisplayName>
+    <PublisherDisplayName>DepManager</PublisherDisplayName>
     <Description>Manage global JavaScript packages</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -29,9 +29,9 @@
   </Resources>
   
   <Applications>
-    <Application Id="com.depdesk.app" Executable="depdesk.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="com.depmanager.app" Executable="depmanager.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="depdesk"
+        DisplayName="DepManager"
         Description="Manage global JavaScript packages"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -41,7 +41,7 @@
       </uap:VisualElements>
       
       <Extensions>
-        <desktop:Extension Category="windows.fullTrustProcess" Executable="depdesk.exe" />
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="depmanager.exe" />
         
         
       </Extensions>

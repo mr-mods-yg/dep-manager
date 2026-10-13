@@ -5,10 +5,10 @@
 	"info": {
 		"0000": {
 			"ProductVersion": "1.0.0",
-			"CompanyName": "depdesk",
+			"CompanyName": "DepManager",
 			"FileDescription": "Manage global JavaScript packages",
-			"LegalCopyright": "(c) 2026 depdesk",
-			"ProductName": "depdesk",
+			"LegalCopyright": "(c) 2026 DepManager",
+			"ProductName": "DepManager",
 			"Comments": "Global package manager"
 		}
 	}

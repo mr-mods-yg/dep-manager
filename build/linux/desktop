@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
-Name=depdesk
+Name=DepManager
 Comment=Manage global JavaScript packages
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/depdesk %u
+Exec=/usr/local/bin/depmanager %u
 Terminal=false
 Type=Application
-Icon=depdesk
+Icon=depmanager
 Categories=Utility;
-StartupWMClass=depdesk
+StartupWMClass=depmanager
 
  

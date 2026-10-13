@@ -3,15 +3,15 @@
 <plist version="1.0">
 	<dict>
 		<key>CFBundleDisplayName</key>
-		<string>depdesk (Dev)</string>
+		<string>DepManager (Dev)</string>
 		<key>CFBundleExecutable</key>
-		<string>depdesk</string>
+		<string>depmanager</string>
 		<key>CFBundleGetInfoString</key>
 		<string>Global package manager</string>
 		<key>CFBundleIdentifier</key>
-		<string>com.depdesk.app.dev</string>
+		<string>com.depmanager.app.dev</string>
 		<key>CFBundleName</key>
-		<string>depdesk (Dev)</string>
+		<string>DepManager (Dev)</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -30,7 +30,7 @@
 			<true/>
 		</dict>
 		<key>NSHumanReadableCopyright</key>
-		<string>(c) 2026 depdesk</string>
+		<string>(c) 2026 DepManager</string>
 		<key>UILaunchStoryboardName</key>
 		<string>LaunchScreen</string>
 		<key>UIRequiredDeviceCapabilities</key>

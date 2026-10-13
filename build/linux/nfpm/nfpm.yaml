@@ -3,7 +3,7 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "depdesk"
+name: "depmanager"
 arch: ${GOARCH}
 platform: "linux"
 version: "1.0.0"
@@ -11,18 +11,18 @@ section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
 description: "Manage global JavaScript packages"
-vendor: "depdesk"
+vendor: "DepManager"
 homepage: "https://wails.io"
 license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/depdesk"
-    dst: "/usr/local/bin/depdesk"
+  - src: "./bin/depmanager"
+    dst: "/usr/local/bin/depmanager"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/depdesk.png"
-  - src: "./build/linux/depdesk.desktop"
-    dst: "/usr/share/applications/depdesk.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/depmanager.png"
+  - src: "./build/linux/depmanager.desktop"
+    dst: "/usr/share/applications/depmanager.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

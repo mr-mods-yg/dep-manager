@@ -1,4 +1,4 @@
-module depdesk
+module depmanager
 
 go 1.25.0
 

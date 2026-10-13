@@ -8,15 +8,15 @@
         AllowPromptForPassword="false">
     </Settings>
     <Installer
-        Path="depdesk.exe"
+        Path="depmanager.exe"
         Arguments=""
-        InstallLocation="C:\Program Files\depdesk\depdesk">
+        InstallLocation="C:\Program Files\DepManager\DepManager">
     </Installer>
     <PackageInformation
-        PackageName="depdesk"
-        PackageDisplayName="depdesk"
-        PublisherName="CN=depdesk"
-        PublisherDisplayName="depdesk"
+        PackageName="DepManager"
+        PackageDisplayName="DepManager"
+        PublisherName="CN=DepManager"
+        PublisherDisplayName="DepManager"
         Version="1.0.0.0"
         PackageDescription="Manage global JavaScript packages">
         <Capabilities>
@@ -25,10 +25,10 @@
         </Capabilities>
         <Applications>
             <Application
-                Id="com.depdesk.app"
+                Id="com.depmanager.app"
                 Description="Manage global JavaScript packages"
-                DisplayName="depdesk"
-                ExecutableName="depdesk.exe"
+                DisplayName="DepManager"
+                ExecutableName="depmanager.exe"
                 EntryPoint="Windows.FullTrustApplication">
                 
             </Application>
@@ -41,13 +41,13 @@
         </Dependencies>
         <Properties>
             <Framework>false</Framework>
-            <DisplayName>depdesk</DisplayName>
-            <PublisherDisplayName>depdesk</PublisherDisplayName>
+            <DisplayName>DepManager</DisplayName>
+            <PublisherDisplayName>DepManager</PublisherDisplayName>
             <Description>Manage global JavaScript packages</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
-    <SaveLocation PackagePath="depdesk.msix" />
+    <SaveLocation PackagePath="DepManager.msix" />
     <PackageIntegrity>
         <CertificatePath></CertificatePath>
     </PackageIntegrity>

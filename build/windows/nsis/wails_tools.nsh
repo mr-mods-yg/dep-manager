@@ -5,19 +5,19 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "depdesk"
+    !define INFO_PROJECTNAME "depmanager"
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "depdesk"
+    !define INFO_COMPANYNAME "DepManager"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "depdesk"
+    !define INFO_PRODUCTNAME "DepManager"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "1.0.0"
 !endif
 !ifndef INFO_COPYRIGHT
-    !define INFO_COPYRIGHT "(c) 2026 depdesk"
+    !define INFO_COPYRIGHT "(c) 2026 DepManager"
 !endif
 !ifndef PRODUCT_EXECUTABLE
     !define PRODUCT_EXECUTABLE "${INFO_PROJECTNAME}.exe"

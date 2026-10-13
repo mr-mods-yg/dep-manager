@@ -3,7 +3,7 @@
 <plist version="1.0">
 	<dict>
 		<key>CFBundleExecutable</key>
-		<string>depdesk</string>
+		<string>depmanager</string>
 		<key>CFBundleGetInfoString</key>
 		<string>Global package manager</string>
 		<key>CFBundleIconFile</key>
@@ -11,9 +11,9 @@
 		<key>CFBundleIconName</key>
 		<string>appicon</string>
 		<key>CFBundleIdentifier</key>
-		<string>com.depdesk.app</string>
+		<string>com.depmanager.app</string>
 		<key>CFBundleName</key>
-		<string>depdesk</string>
+		<string>DepManager</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -25,6 +25,6 @@
 		<key>NSHighResolutionCapable</key>
 		<string>true</string>
 		<key>NSHumanReadableCopyright</key>
-		<string>(c) 2026 depdesk</string>
+		<string>(c) 2026 DepManager</string>
 	</dict>
 </plist>
