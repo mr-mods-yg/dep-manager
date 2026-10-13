@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MsixPackagingToolTemplate
+    xmlns="http://schemas.microsoft.com/msix/packaging/msixpackagingtool/template/2022">
+    <Settings
+        AllowTelemetry="false"
+        ApplyACLsToPackageFiles="true"
+        GenerateCommandLineFile="true"
+        AllowPromptForPassword="false">
+    </Settings>
+    <Installer
+        Path="depdesk.exe"
+        Arguments=""
+        InstallLocation="C:\Program Files\depdesk\depdesk">
+    </Installer>
+    <PackageInformation
+        PackageName="depdesk"
+        PackageDisplayName="depdesk"
+        PublisherName="CN=depdesk"
+        PublisherDisplayName="depdesk"
+        Version="1.0.0.0"
+        PackageDescription="Manage global JavaScript packages">
+        <Capabilities>
+            <Capability Name="runFullTrust" />
+            
+        </Capabilities>
+        <Applications>
+            <Application
+                Id="com.depdesk.app"
+                Description="Manage global JavaScript packages"
+                DisplayName="depdesk"
+                ExecutableName="depdesk.exe"
+                EntryPoint="Windows.FullTrustApplication">
+                
+            </Application>
+        </Applications>
+        <Resources>
+            <Resource Language="en-us" />
+        </Resources>
+        <Dependencies>
+            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+        </Dependencies>
+        <Properties>
+            <Framework>false</Framework>
+            <DisplayName>depdesk</DisplayName>
+            <PublisherDisplayName>depdesk</PublisherDisplayName>
+            <Description>Manage global JavaScript packages</Description>
+            <Logo>Assets\AppIcon.png</Logo>
+        </Properties>
+    </PackageInformation>
+    <SaveLocation PackagePath="depdesk.msix" />
+    <PackageIntegrity>
+        <CertificatePath></CertificatePath>
+    </PackageIntegrity>
+</MsixPackagingToolTemplate>
