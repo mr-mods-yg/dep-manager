@@ -4,7 +4,7 @@
   },
   "info": {
     "0000": {
-      "ProductVersion": "0.0.2-alpha.1",
+      "ProductVersion": "0.0.2-alpha.2",
       "CompanyName": "DepManager",
       "FileDescription": "Manage global JavaScript packages",
       "LegalCopyright": "(c) 2026 DepManager",
