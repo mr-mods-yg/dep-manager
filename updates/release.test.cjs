@@ -119,6 +119,15 @@ test('lockfile changes trigger publication even with unchanged version metadata'
   assert.deepEqual(findCodeChanges(f.root, f.base), ['frontend/package-lock.json']);
 });
 
+test('changes inside the packages folder trigger publication', (t) => {
+  const f = fixture(t);
+  f.write('packages/service.go', 'package packages\n');
+  const published = f.commit();
+  f.write('packages/service.go', 'package packages\n// updated package actions\n');
+  f.commit();
+  assert.deepEqual(findCodeChanges(f.root, published), ['packages/service.go']);
+});
+
 test('deleted source and changed build recipes trigger publication', (t) => {
   const f = fixture(t);
   fs.unlinkSync(path.join(f.root, 'frontend/src/App.tsx'));

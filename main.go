@@ -1,6 +1,7 @@
 package main
 
 import (
+	"depmanager/packages"
 	"depmanager/updates"
 	"embed"
 	"encoding/json"
@@ -25,7 +26,7 @@ func main() {
 		log.Fatal("application version is missing from frontend/package.json")
 	}
 	operations := &sync.RWMutex{}
-	packageService := &PackageService{operations: operations}
+	packageService := packages.New(operations)
 	updateService := updates.New(manifest.Version, operations, manifest.ReleaseChannel)
 	app := application.New(application.Options{
 		Name:        "DepManager",
@@ -41,9 +42,9 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
-	packageService.emitProgress = func(progress PackageActionProgress) {
-		app.Event.Emit(packageProgressEvent, progress)
-	}
+	packages.Configure(packageService, func(progress packages.PackageActionProgress) {
+		app.Event.Emit(packages.ProgressEvent, progress)
+	})
 	if err := updates.Configure(updateService, app.Updater, app.Quit); err != nil {
 		log.Fatal(err)
 	}

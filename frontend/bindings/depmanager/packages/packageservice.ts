@@ -14,19 +14,19 @@ import * as $models from "./models.js";
  * An empty result means the registry could not be checked.
  */
 export function GetLatestPackageVersion(manager: string, packageName: string): $CancellablePromise<string> {
-    return $Call.ByID(2021829816, manager, packageName);
+    return $Call.ByID(1288916341, manager, packageName);
 }
 
 /**
  * GetPackageManagers discovers the supported package managers and their direct global installs.
  */
 export function GetPackageManagers(): $CancellablePromise<$models.PackageManagerInfo[] | null> {
-    return $Call.ByID(3420884589);
+    return $Call.ByID(4139119114);
 }
 
 /**
  * RunPackageAction updates a global package to its latest version or removes it.
  */
 export function RunPackageAction(manager: string, packageName: string, action: string): $CancellablePromise<$models.PackageActionResult> {
-    return $Call.ByID(3179645928, manager, packageName, action);
+    return $Call.ByID(3910424179, manager, packageName, action);
 }

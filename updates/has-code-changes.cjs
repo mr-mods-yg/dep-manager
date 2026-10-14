@@ -5,6 +5,7 @@ function isBuildInput(file) {
   if (file.endsWith('.md') || file === 'updates/release-plan.json') return false;
   return /^[^/]+\.go$/.test(file)
     || ['go.mod', 'go.sum', 'Taskfile.yml'].includes(file)
+    || file.startsWith('packages/')
     || file.startsWith('updates/')
     || file.startsWith('.github/workflows/')
     || file === 'build/Taskfile.yml'

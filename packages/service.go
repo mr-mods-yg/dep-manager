@@ -1,4 +1,4 @@
-package main
+package packages
 
 import (
 	"bytes"
@@ -41,6 +41,14 @@ type PackageService struct {
 	operations     *sync.RWMutex
 	pnpmOperations sync.RWMutex
 	emitProgress   func(PackageActionProgress)
+}
+
+func New(operations *sync.RWMutex) *PackageService {
+	return &PackageService{operations: operations}
+}
+
+func Configure(s *PackageService, emitProgress func(PackageActionProgress)) {
+	s.emitProgress = emitProgress
 }
 
 type latestVersionCacheEntry struct {

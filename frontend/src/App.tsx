@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
-import * as PackageService from '../bindings/depmanager/packageservice'
+import * as PackageService from '../bindings/depmanager/packages/packageservice'
 import AppUpdates from './AppUpdates'
 
 type GlobalPackage = {
