@@ -68,7 +68,9 @@ test('invalid targets and channels cannot change metadata', (t) => {
     assert.throws(() => bumpVersion(f.root));
   }
   f.write('updates/release-plan.json', '{"version":"1.0.0"}');
-  assert.throws(() => bumpVersion(f.root, { channel: 'invalid' }), /channel/);
+  for (const channel of ['invalid', 'beta']) {
+    assert.throws(() => bumpVersion(f.root, { channel }), /channel/);
+  }
   assert.equal(f.read('frontend/package.json'), before);
 });
 
@@ -140,17 +142,16 @@ test('a missing first baseline builds once and invalid baselines fail closed', (
   assert.throws(() => findCodeChanges(f.root, 'invalid-release-tag'));
 });
 
-test('nightly, beta and stable use one target with independent counters', () => {
+test('nightly and stable use one target with counters reset for new targets', () => {
   const tags = ['v1.3.0-alpha.1', 'v1.3.0-alpha.9', 'v1.3.0-beta.1', 'v1.2.1-alpha.99', 'v1.3.0-alpha.01'];
   assert.equal(nextReleaseVersion('1.3.0', 'nightly', tags, ['v1.2.0']), '1.3.0-alpha.10');
-  assert.equal(nextReleaseVersion('1.3.0', 'beta', tags, ['v1.2.0']), '1.3.0-beta.2');
   assert.equal(nextReleaseVersion('1.3.0', 'stable', tags, ['v1.2.0']), '1.3.0');
   assert.equal(nextReleaseVersion('1.3.1', 'nightly', tags, ['v1.3.0']), '1.3.1-alpha.1');
-  assert.equal(nextReleaseVersion('2.0.0', 'beta', tags, ['v1.3.0']), '2.0.0-beta.1');
+  assert.equal(nextReleaseVersion('2.0.0', 'nightly', tags, ['v1.3.0']), '2.0.0-alpha.1');
 });
 
 test('published stable versions and reserved tags cannot be reused', () => {
-  for (const channel of ['nightly', 'beta', 'stable']) {
+  for (const channel of ['nightly', 'stable']) {
     for (const target of ['1.2.0', '1.1.9']) {
       assert.throws(() => nextReleaseVersion(target, channel, [], ['v1.2.0']), /newer than published stable/);
     }
@@ -160,7 +161,7 @@ test('published stable versions and reserved tags cannot be reused', () => {
 
 test('failed tagged builds reserve their counter without using workflow run numbers', () => {
   assert.equal(nextReleaseVersion('1.0.0', 'nightly', ['v1.0.0-alpha.1']), '1.0.0-alpha.2');
-  assert.equal(nextReleaseVersion('1.0.0', 'beta', ['v1.0.0-alpha.8']), '1.0.0-beta.1');
+  assert.equal(nextReleaseVersion('1.0.0', 'nightly', ['v1.0.0-alpha.8', 'v1.0.0-beta.99']), '1.0.0-alpha.9');
 });
 
 test('SemVer precedence follows the specification and ignores build metadata', () => {

@@ -35,7 +35,7 @@ Bun packages are read from its configured global directory, including `BUN_INSTA
 
 ## Application updates
 
-The update panel below the package list shows the running app version and a **Check for updates** button. Choose **Stable**, **Beta**, or **Nightly** with the **Update channel** selector. The selection is saved locally and controls both automatic updates and **Update now**. Stable checks stable releases; Beta includes beta and stable releases; Nightly includes nightly, beta, and stable releases. Each build defaults to its own channel on first launch. The highest eligible SemVer version is offered, even when GitHub lists releases in a different order. Changing channels immediately checks that channel and clears the previous update offer. Switching to a channel with an older version does not downgrade the app. DepManager also checks on startup and every six hours while the app stays open.
+The update panel below the package list shows the running app version and a **Check for updates** button. Choose **Stable** or **Nightly** with the **Update channel** selector. The selection is saved locally and controls both automatic updates and **Update now**. Stable checks stable releases; Nightly includes nightly and stable releases. Each build defaults to its own channel on first launch, and unsupported saved preferences fall back to that default. The highest eligible SemVer version is offered, even when GitHub lists releases in a different order. Changing channels immediately checks that channel and clears the previous update offer. Switching to a channel with an older version does not downgrade the app. DepManager also checks on startup and every six hours while the app stays open.
 
 **Automatically install updates** is enabled by default for supported production builds. Turn it off to review available releases and use **Update now** when ready. The preference is saved locally.
 
@@ -117,7 +117,7 @@ wails3 generate bindings -ts -i
 | `main.go` | Desktop window, service registration, and embedded app version/assets. |
 | `packageservice.go` | Manager discovery, installed-version recovery, and package actions. |
 | `updates/` | Update service, platform installation helpers, build-mode controls, tests, and release version script. |
-| `updates/release-plan.json` | The next release's explicit SemVer target, shared by nightly, beta, and stable. |
+| `updates/release-plan.json` | The next release's explicit SemVer target, shared by nightly and stable. |
 | `AGENTS.md` | Repository rules for branches, versioning, updates, changelogs, and verification. |
 | `frontend/src/` | React interface and application update controls. |
 | `frontend/public/style.css` | App styling and loading animations. |
@@ -131,25 +131,24 @@ wails3 generate bindings -ts -i
 
 Development and automatic releases use the `nightly` branch. Pushes to `main` do not publish releases. Pushes to `nightly` compare application source, dependencies, assets, and build scripts against the last published nightly release. Documentation and automatic version metadata changes are ignored. If there is no code change, the workflow skips the version bump, builds, and publication. The first nightly compares against the newest stable version tag when available.
 
-The three release branches are `nightly`, `beta`, and `main` (stable). Nightly pushes release automatically when code changes. Beta and stable builds are promoted by manually running the release workflow against `beta` or `main`, using the same code-change check.
+The two release branches are `nightly` and `main` (Stable). Nightly pushes release automatically when code changes. Promote tested changes directly to main, then manually run the release workflow against main to publish stable, using the same code-change check.
 
-Releases follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Set the next target in `updates/release-plan.json` and carry that target through the three stages:
+Releases follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Set the next target in `updates/release-plan.json` and carry that target through both stages:
 
 | Channel | Branch | Example version |
 | --- | --- | --- |
 | Nightly | `nightly` | `0.0.1-alpha.1`, `0.0.1-alpha.2` |
-| Beta | `beta` | `0.0.1-beta.1`, `0.0.1-beta.2` |
 | Stable | `main` | `0.0.1` |
 
-Nightly uses the `alpha` identifier because SemVer orders `alpha` before `beta`; the channel remains named Nightly. All stages keep the same numeric target. Prerelease counters are independent per target/channel and come from reserved tags, rather than workflow run numbers. A new target starts its counters at 1. A failed tagged build reserves its counter, while skipped runs do not consume one. Existing published nightly versions keep their original names and remain recognized by the updater.
+Nightly uses the SemVer `alpha` prerelease identifier; the channel remains named Nightly. Both stages keep the same numeric target. The prerelease counter comes from reserved tags, rather than workflow run numbers. A new target starts its counter at 1. A failed tagged build reserves its counter, while skipped runs do not consume one. Existing published nightly versions keep their original names and remain recognized by the updater.
 
-The fresh development series starts at `0.0.1`. Keep that base fixed while iterating on its alpha and beta builds. The next nightly after `0.0.1-alpha.1` is `0.0.1-alpha.2`; a later release cycle can target `0.0.2` and restart its counters at 1. For new functionality or breaking development changes, explicitly choose the next minor target, such as `0.1.0`. The Stable channel identifies a release without a prerelease suffix; major-zero releases still have a development API. Publishing from main does not automatically advance to `1.0.0`. Make that transition deliberately when the app and its compatibility contract are ready.
+The fresh development series starts at `0.0.1`. Keep that base fixed while iterating on its alpha builds. The next nightly after `0.0.1-alpha.1` is `0.0.1-alpha.2`. After publishing stable, explicitly plan the next release cycle, such as `0.0.2`, and restart its counter at 1. For new functionality or breaking development changes, explicitly choose the next minor target, such as `0.1.0`. The Stable channel identifies a release without a prerelease suffix; major-zero releases still have a development API. Publishing from main does not automatically advance to `1.0.0`. Make that transition deliberately when the app and its compatibility contract are ready.
 
 After reaching `1.0.0`, use PATCH for compatible fixes, MINOR for compatible features or deprecations, and MAJOR for incompatible changes. Reset lower components to zero when increasing a higher component. Version targets are explicit because a build script cannot determine whether a change breaks compatibility. Changing the plan alone does not publish a release, and a published stable target cannot be reused.
 
 DepManager's public compatibility contract covers documented package actions and manager support, saved settings, and the update protocol (version/channel metadata, platform asset names, and SHA256SUMS). `1.0.0` establishes that contract; major-zero versions are initial development. Keep released binaries and tags immutable, and publish changed contents under a new version.
 
-The workflow commits metadata on the selected branch, tags it, tests the updater, and builds Windows and Linux packages. Nightly and beta publish GitHub **prereleases**; stable publishes a regular release. Both installers and `SHA256SUMS` are included. Windows fixed version fields and NSIS keep the numeric version required by Windows, while the app embeds the full release version.
+The workflow commits metadata on the selected branch, tags it, tests the updater, and builds Windows and Linux packages. Nightly publishes GitHub **prereleases**; Stable publishes regular releases. Both installers and `SHA256SUMS` are included. Windows fixed version fields and NSIS keep the numeric version required by Windows, while the app embeds the full release version.
 
 ### Changelog
 

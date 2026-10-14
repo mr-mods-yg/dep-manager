@@ -14,15 +14,15 @@ import (
 
 func TestChannelDefaults(t *testing.T) {
 	for _, test := range []struct{ version, channel string }{
-		{"1.0.0-alpha.1", "nightly"}, {"1.0.0-beta.1", "beta"},
+		{"1.0.0-alpha.1", "nightly"},
 		{"1.0.0", "stable"}, {"0.0.6-nightly.8", "nightly"},
 	} {
 		if got := New(test.version, nil).GetAppInfo().Channel; got != test.channel {
 			t.Errorf("%s defaulted to %s, want %s", test.version, got, test.channel)
 		}
 	}
-	if got := New("1.0.0-beta.1", nil, "beta").GetAppInfo().Channel; got != "beta" {
-		t.Fatalf("explicit beta channel defaulted to %s", got)
+	if _, err := newChannelProvider("beta", ""); err == nil {
+		t.Fatal("removed beta channel was accepted")
 	}
 }
 
@@ -42,7 +42,7 @@ func TestChannelsChooseHighestSemVerAcrossPages(t *testing.T) {
 			t.Error("channel lookup did not request a full release page")
 		}
 		page := r.URL.Query().Get("page")
-		tags := []string{"v1.3.0-alpha.2", "v1.2.0-beta.10", "v1.1.0", "v1.4.0-rc.1", "v99.0.0", "v01.9.0", "v9.0.0-alpha.01", "v88.0.0-beta.1"}
+		tags := []string{"v1.3.0-alpha.2", "v88.0.0-beta.10", "v77.0.0-alpha.1", "v76.0.0", "v1.1.0", "v1.4.0-rc.1", "v99.0.0", "v01.9.0", "v9.0.0-alpha.01"}
 		switch page {
 		case "1":
 			w.Header().Set("Link", "<"+server.URL+"/repos/"+releaseRepository+"/releases?page=2>; rel=\"next\"")
@@ -55,7 +55,7 @@ func TestChannelsChooseHighestSemVerAcrossPages(t *testing.T) {
 		for _, tag := range tags {
 			releases = append(releases, map[string]any{
 				"tag_name": tag, "draft": tag == "v99.0.0",
-				"prerelease": versionChannel(tag) != "stable" && tag != "v88.0.0-beta.1",
+				"prerelease": tag == "v76.0.0" || versionChannel(tag) != "stable" && tag != "v77.0.0-alpha.1",
 				"assets": []map[string]any{
 					{"name": "depmanager-amd64-installer.exe", "browser_download_url": server.URL + "/installer"},
 					{"name": "SHA256SUMS", "browser_download_url": server.URL + "/checksums"},
@@ -66,7 +66,7 @@ func TestChannelsChooseHighestSemVerAcrossPages(t *testing.T) {
 	}))
 	defer server.Close()
 	for _, test := range []struct{ channel, version string }{
-		{"nightly", "1.3.0-alpha.10"}, {"beta", "1.2.0-beta.10"}, {"stable", "1.1.0"},
+		{"nightly", "1.3.0-alpha.10"}, {"stable", "1.1.0"},
 	} {
 		t.Run(test.channel, func(t *testing.T) {
 			provider, err := newChannelProvider(test.channel, server.URL)

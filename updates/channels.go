@@ -29,8 +29,6 @@ func versionChannel(version string) string {
 	switch strings.Split(strings.TrimPrefix(prerelease, "-"), ".")[0] {
 	case "alpha", "nightly": // Keep existing installations on the nightly channel.
 		return "nightly"
-	case "beta":
-		return "beta"
 	}
 	return ""
 }
@@ -40,9 +38,9 @@ func allowsRelease(channel, version string, prerelease bool) bool {
 	if actual == "" || (actual == "stable") == prerelease {
 		return false
 	}
-	// A channel includes more mature releases, allowing promotion without
-	// changing a saved preference. Beta never installs a nightly build.
-	return actual == "stable" || actual == channel || channel == "nightly" && actual == "beta"
+	// Nightly can promote to a newer stable release without changing the
+	// saved channel. Unsupported prerelease types are ignored.
+	return actual == "stable" || actual == channel
 }
 
 // Filter GitHub's release list before the framework chooses an asset. Its

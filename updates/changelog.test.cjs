@@ -84,7 +84,9 @@ test('reject invalid dates, versions and branches', () => {
   for (const version of ['bad]version', '01.0.0', '1.0.0-alpha.01', '1.0.0+', '1.0.0-']) {
     assert.throws(() => recordRelease(source, { ...options, version }), /Invalid release version/);
   }
-  assert.throws(() => recordRelease(source, { ...options, branch: 'stable' }), /Invalid release branch/);
+  for (const branch of ['stable', 'beta']) {
+    assert.throws(() => recordRelease(source, { ...options, branch }), /Invalid release branch/);
+  }
 });
 
 test('record SemVer prereleases and preserve build metadata in release links', () => {

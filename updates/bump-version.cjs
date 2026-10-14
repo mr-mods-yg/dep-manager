@@ -7,7 +7,7 @@ function nextReleaseVersion(target, channel, tags, publishedStableVersions = [])
   const parsed = parseVersion(target);
   if (parsed.prerelease.length || parsed.build) throw new Error('The release target must be a plain MAJOR.MINOR.PATCH version');
   if (parsed.core.some(part => part > 65535n)) throw new Error('The release target exceeds Windows numeric version limits');
-  if (!['nightly', 'beta', 'stable'].includes(channel)) throw new Error('Invalid release channel');
+  if (!['nightly', 'stable'].includes(channel)) throw new Error('Invalid release channel');
   for (const stable of publishedStableVersions) {
     const version = stable.replace(/^v/, '');
     const published = parseVersion(version);
@@ -17,8 +17,8 @@ function nextReleaseVersion(target, channel, tags, publishedStableVersions = [])
   const versions = tags.map(tag => tag.replace(/^v/, ''));
   if (versions.includes(target)) throw new Error('The stable target already has a tag; choose a new release target');
   if (channel === 'stable') return target;
-  // "alpha" sorts before "beta" in SemVer; the channel stays named Nightly.
-  const prefix = target + '-' + (channel === 'nightly' ? 'alpha' : 'beta') + '.';
+  // Nightly uses SemVer alpha identifiers; stable has no prerelease suffix.
+  const prefix = target + '-alpha.';
   let counter = 0n;
   for (const version of versions) {
     if (!version.startsWith(prefix)) continue;
@@ -80,8 +80,8 @@ function bumpVersion(root, options = {}) {
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  if (args.length !== 1 || !['--nightly', '--beta', '--stable'].includes(args[0])) {
-    throw new Error('Usage: node updates/bump-version.cjs --nightly|--beta|--stable');
+  if (args.length !== 1 || !['--nightly', '--stable'].includes(args[0])) {
+    throw new Error('Usage: node updates/bump-version.cjs --nightly|--stable');
   }
   process.stdout.write(bumpVersion(path.resolve(__dirname, '..'), {
     channel: args[0].slice(2),

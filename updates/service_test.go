@@ -158,10 +158,7 @@ func TestNightlyReleaseChecks(t *testing.T) {
 		{"stable promotion", "1.0.4-nightly.1", "v1.0.4", true},
 		{"stable ignores nightly", "1.0.3", "v1.0.4-nightly.1", false},
 		{"new alpha", "1.0.0-alpha.1", "v1.0.0-alpha.2", true},
-		{"beta promotion", "1.0.0-alpha.10", "v1.0.0-beta.1", true},
-		{"beta excludes nightly", "1.0.0-beta.1", "v1.1.0-alpha.2", false},
-		{"new beta", "1.0.0-beta.1", "v1.0.0-beta.2", true},
-		{"beta to stable", "1.0.0-beta.2", "v1.0.0", true},
+		{"nightly ignores removed beta", "1.0.0-alpha.10", "v1.0.0-beta.1", false},
 		{"stable excludes beta", "0.9.0", "v1.0.0-beta.2", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -184,7 +181,6 @@ func TestSelectedChannelOverridesBuildChannel(t *testing.T) {
 	for _, test := range []struct{ current, selected, latest string }{
 		{"1.0.3", "nightly", "v1.0.4-nightly.1"},
 		{"1.0.4-nightly.1", "stable", "v1.0.5"},
-		{"0.9.0", "beta", "v1.0.0-beta.1"},
 		{"0.0.6-nightly.8", "nightly", "v1.0.0-alpha.1"},
 	} {
 		t.Run(test.selected, func(t *testing.T) {

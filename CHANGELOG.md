@@ -9,6 +9,10 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 
 ## [Unreleased]
 
+### Removed
+
+- The Beta branch, release channel, and update selector option. Releases now progress directly from Nightly to Stable on main.
+
 ## [0.0.1-alpha.1] - 2026-10-14
 
 ### Added
