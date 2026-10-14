@@ -49,7 +49,7 @@ func New(version string, operations *sync.RWMutex, channels ...string) *Service 
 	channel := defaultUpdateChannel(version)
 	if len(channels) > 0 {
 		switch channels[0] {
-		case "stable", "beta", "nightly":
+		case "stable", "nightly":
 			channel = channels[0]
 		}
 	}
@@ -79,7 +79,7 @@ func (p verifiedProvider) Check(ctx context.Context, req updater.CheckRequest) (
 
 type channelProvider struct {
 	updater.Provider
-	stable, beta, nightly updater.Provider
+	stable, nightly updater.Provider
 }
 
 func (p *channelProvider) selectChannel(channel string) error {
@@ -88,17 +88,15 @@ func (p *channelProvider) selectChannel(channel string) error {
 		p.Provider = p.stable
 	case "nightly":
 		p.Provider = p.nightly
-	case "beta":
-		p.Provider = p.beta
 	default:
-		return errors.New("choose the stable, beta or nightly update channel")
+		return errors.New("choose the stable or nightly update channel")
 	}
 	return nil
 }
 
 func newChannelProvider(channel, baseURL string) (*channelProvider, error) {
 	p := &channelProvider{}
-	for name, destination := range map[string]*updater.Provider{"stable": &p.stable, "beta": &p.beta, "nightly": &p.nightly} {
+	for name, destination := range map[string]*updater.Provider{"stable": &p.stable, "nightly": &p.nightly} {
 		config := releaseProviderConfig(name)
 		config.BaseURL = baseURL
 		provider, err := githubprovider.New(config)

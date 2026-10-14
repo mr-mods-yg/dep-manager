@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   version:
-    if: contains(fromJSON('["nightly", "beta", "main"]'), github.ref_name) && github.actor != 'github-actions[bot]'
+    if: contains(fromJSON('["nightly", "main"]'), github.ref_name) && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     env:
       CHANNEL: ${{ github.ref_name == 'main' && 'stable' || github.ref_name }}
@@ -44,7 +44,7 @@ jobs:
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
             | jq -s 'add' > "${RUNNER_TEMP}/channel-releases.json"
-          baseline="$(jq -r --arg channel "${CHANNEL}" 'map(select(.draft == false and (if $channel == "stable" then .prerelease == false elif $channel == "nightly" then .prerelease == true and (.tag_name | test("-(alpha|nightly)\\.")) else .prerelease == true and (.tag_name | contains("-beta.")) end))) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
+          baseline="$(jq -r --arg channel "${CHANNEL}" 'map(select(.draft == false and (if $channel == "stable" then .prerelease == false else .prerelease == true and (.tag_name | test("-(alpha|nightly)\\.")) end))) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
           stable_versions="$(jq -c 'map(select(.draft == false and .prerelease == false) | .tag_name)' "${RUNNER_TEMP}/channel-releases.json")"
           echo "PUBLISHED_STABLE_VERSIONS=${stable_versions}" >> "$GITHUB_ENV"
           if [ -z "${baseline}" ]; then

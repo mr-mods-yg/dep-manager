@@ -63,7 +63,7 @@ function recordRelease(source, { version, date, branch, notes }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
     throw new Error('Use a valid YYYY-MM-DD release date');
   }
-  if (!['nightly', 'beta', 'main'].includes(branch)) throw new Error('Invalid release branch');
+  if (!['nightly', 'main'].includes(branch)) throw new Error('Invalid release branch');
   const doc = document(source);
   // Rerunning a publication must preserve an already recorded, curated entry.
   if (doc.sections.some(s => s.version === version)) return doc.text;

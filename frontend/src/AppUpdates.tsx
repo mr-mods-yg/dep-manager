@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import * as UpdateService from '../bindings/depmanager/updates/service'
 
-type UpdateChannel = 'stable' | 'beta' | 'nightly'
+type UpdateChannel = 'stable' | 'nightly'
 
 type UpdateInfo = {
   currentVersion: string
@@ -32,7 +32,7 @@ export default function AppUpdates({ packagesBusy, onUpdating }: { packagesBusy:
   const [info, setInfo] = useState<UpdateInfo | null>(null)
   const [channel, setChannel] = useState<UpdateChannel | null>(() => {
     const saved = readPreference('depmanager.updateChannel', '')
-    return saved === 'stable' || saved === 'beta' || saved === 'nightly' ? saved : null
+    return saved === 'stable' || saved === 'nightly' ? saved : null
   })
   const selectedChannel = useRef(channel)
   const [checking, setChecking] = useState(false)
@@ -147,7 +147,6 @@ export default function AppUpdates({ packagesBusy, onUpdating }: { packagesBusy:
           Update channel
           <select aria-label="Update channel" value={channel ?? 'stable'} disabled={checking || installing || !channel} onChange={(event) => void check(event.target.value as UpdateChannel)}>
             <option value="stable">Stable</option>
-            <option value="beta">Beta</option>
             <option value="nightly">Nightly</option>
           </select>
         </label>
