@@ -1,4 +1,4 @@
-name: Build and release nightly apps
+name: Build and release desktop apps
 
 on:
   push:
@@ -9,13 +9,16 @@ permissions:
   contents: write
 
 concurrency:
-  group: desktop-release-nightly
+  group: desktop-release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   version:
-    if: github.ref == 'refs/heads/nightly' && github.actor != 'github-actions[bot]'
+    if: contains(fromJSON('["nightly", "beta", "main"]'), github.ref_name) && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    env:
+      CHANNEL: ${{ github.ref_name == 'main' && 'stable' || github.ref_name }}
+      RELEASE_BRANCH: ${{ github.ref_name }}
     outputs:
       changed: ${{ steps.changes.outputs.changed }}
       version: ${{ steps.bump.outputs.version }}
@@ -23,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: nightly
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -33,16 +36,19 @@ jobs:
       - name: Test release scripts
         run: node --test updates/*.test.cjs
 
-      - name: Check for code changes since the last published nightly
+      - name: Check for code changes since the last published channel release
         id: changes
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
-            --jq '.[] | select(.draft == false and .prerelease == true) | select(.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-nightly\\.")) | .tag_name' \
-            > "${RUNNER_TEMP}/nightly-release-tags.txt"
-          baseline="$(sed -n '1p' "${RUNNER_TEMP}/nightly-release-tags.txt")"
+            | jq -s 'add' > "${RUNNER_TEMP}/channel-releases.json"
+          baseline="$(jq -r --arg channel "${CHANNEL}" 'map(select(.draft == false and (if $channel == "stable" then .prerelease == false else .prerelease == true and (.tag_name | contains("-" + $channel + ".")) end))) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
+          stable_version="$(jq -r 'map(select(.draft == false and .prerelease == false)) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
+          beta_version="$(jq -r 'map(select(.draft == false and .prerelease == true and (.tag_name | contains("-beta.")))) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
+          echo "STABLE_VERSION=${stable_version}" >> "$GITHUB_ENV"
+          echo "BETA_VERSION=${beta_version}" >> "$GITHUB_ENV"
           if [ -z "${baseline}" ]; then
             baseline="$(git tag --list 'v*' --sort=-version:refname | sed -n '/^v[0-9]*\.[0-9]*\.[0-9]*$/p' | sed -n '1p')"
           fi
@@ -52,18 +58,20 @@ jobs:
             echo "No code changes since ${baseline}; version bump and release skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Bump nightly version and tag the release
+      - name: Set channel version and tag the release
         id: bump
         if: steps.changes.outputs.changed == 'true'
         shell: bash
         run: |
-          version="$(node updates/bump-version.cjs --nightly "${GITHUB_RUN_NUMBER}")"
+          version="$(node updates/bump-version.cjs "--${CHANNEL}" "${GITHUB_RUN_NUMBER}")"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add build/config.yml build/windows/info.json build/windows/nsis/wails_tools.nsh build/linux/nfpm/nfpm.yaml frontend/package.json frontend/package-lock.json
-          git commit -m "chore(release): v${version} [skip ci]"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): v${version} [skip ci]"
+          fi
           git tag "v${version}"
-          git push --atomic origin HEAD:nightly "refs/tags/v${version}"
+          git push --atomic origin "HEAD:${RELEASE_BRANCH}" "refs/tags/v${version}"
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -169,16 +177,20 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Publish GitHub prerelease
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.version.outputs.version }}
+          CHANNEL: ${{ github.ref_name == 'main' && 'stable' || github.ref_name }}
         run: |
           (cd release-assets && sha256sum *.exe *.deb > SHA256SUMS)
+          release_flags=(--prerelease --latest=false)
+          if [ "${CHANNEL}" = "stable" ]; then
+            release_flags=(--latest=true)
+          fi
           gh release create "v${VERSION}" release-assets/* \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "DepManager Nightly v${VERSION}" \
-            --prerelease \
-            --latest=false \
+            --title "DepManager ${CHANNEL^} v${VERSION}" \
+            "${release_flags[@]}" \
             --generate-notes \
             --verify-tag

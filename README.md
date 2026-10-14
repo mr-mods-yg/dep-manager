@@ -35,13 +35,13 @@ Bun packages are read from its configured global directory, including `BUN_INSTA
 
 ## Application updates
 
-The update panel below the package list shows the running app version and a **Check for updates** button. DepManager checks this repository's latest stable GitHub release on startup and every six hours while the app stays open.
+The update panel below the package list shows the running app version and a **Check for updates** button. Choose **Stable** or **Nightly** with the **Update channel** selector. The selection is saved locally and controls both automatic updates and **Update now**. Stable checks published stable releases; Nightly includes prereleases. Stable builds default to Stable, and nightly builds default to Nightly on the first launch. Changing channels immediately checks that channel and clears the previous update offer. DepManager also checks on startup and every six hours while the app stays open.
 
 **Automatically install updates** is enabled by default for supported production builds. Turn it off to review available releases and use **Update now** when ready. The preference is saved locally.
 
 Updates download the installer for the current platform and architecture, verify its SHA-256 checksum against the release's `SHA256SUMS` file, and install it. Releases without a matching checksum are rejected. This protects against corrupted downloads; it is not a publisher signature.
 
-- **Windows:** the app closes, runs the per-user installer silently in the existing installation directory, and relaunches. If installation fails, the helper records the error and attempts to reopen the app.
+- **Windows:** the app waits for the update helper to confirm it is ready, then closes, runs the per-user installer silently in the existing installation directory, and reopens its window. If the helper cannot start, the app stays open and shows the error. If installation or reopening fails, the helper records the error for the next launch and attempts to reopen the app after an installation failure.
 - **Debian / Ubuntu:** `pkexec` authorizes `dpkg` to install the downloaded package. A graphical polkit authentication agent must be available; the system may ask for your password. The app restarts as the original user after installation succeeds.
 
 App updates wait for package actions to finish, and package changes are blocked while the application updates. Download and installation failures are shown in the update panel. Automatic installation is attempted once per release to avoid repeated restart attempts; use **Update now** to retry a failed update.
@@ -125,6 +125,14 @@ wails3 generate bindings -ts -i
 
 ## Releases
 
-Pushes to `main` trigger the release workflow. It runs `node updates/bump-version.cjs`, increments the patch version across app and package metadata, commits the version change, and tags the release. Windows and Linux jobs then build their packages, and the publish job uploads both assets with `SHA256SUMS`.
+Development and automatic releases use the `nightly` branch. Pushes to `main` do not publish releases. Pushes to `nightly` compare application source, dependencies, assets, and build scripts against the last published nightly release. Documentation and automatic version metadata changes are ignored. If there is no code change, the workflow skips the version bump, builds, and publication. The first nightly compares against the newest stable version tag when available.
+
+The three release branches are `nightly`, `beta`, and `main` (stable). Nightly pushes release automatically when code changes. Beta and stable builds are promoted by manually running the release workflow against `beta` or `main`, using the same code-change check.
+
+The new series starts at `0.0.5-nightly.N`. Nightly advances the patch after the newest published stable or beta version: stable `1.2.0` leads to nightly `1.2.1-nightly.N`, then `1.2.2-nightly.N`. Beta advances to the next minor after stable, such as `1.3.0-beta.N`; repeated beta builds keep that version and advance the build suffix. The initial beta is `0.1.0-beta.N`. Stable starts at `1.0.0` and promotes the beta version once it is ready, such as `1.3.0`. After a beta establishes a newer minor, nightlies move to that line.
+
+The workflow commits metadata on the selected branch, tags it, tests the updater, and builds Windows and Linux packages. Nightly and beta publish GitHub **prereleases**; stable publishes a regular release. Both installers and `SHA256SUMS` are included. Windows fixed version fields and NSIS keep the numeric version required by Windows, while the app embeds the full release version.
+
+The workflow can also be run manually against `nightly`; the same code-change check applies. It compares with a published release, so a failed build can be retried. Install the first nightly manually to switch from a stable installation to prerelease updates. Existing installations with the old `1.0.x` numbering require a manual install to move to this new version series.
 
 The app embeds its version from `frontend/package.json`, keeping update comparisons aligned with release tags. Older installed versions that predate the in-app updater need a manual upgrade to a release containing this feature first.

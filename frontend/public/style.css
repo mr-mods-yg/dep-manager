@@ -109,6 +109,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8795eb; outline-
 .app-update-controls { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 12px; }
 .auto-update-option { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
 .auto-update-option input { accent-color: var(--accent); }
+.update-channel-option { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; }
+.update-channel-option select { padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.update-channel-option select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.update-channel-option select:disabled { opacity: .62; }
 .app-update-buttons { display: flex; align-items: center; gap: 10px; }
 .app-update-buttons a { color: var(--accent); font-size: 12px; }
 .app-update-spinner { width: 15px; height: 15px; margin-bottom: 0; flex: 0 0 auto; }

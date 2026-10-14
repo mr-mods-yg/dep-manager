@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import * as UpdateService from '../bindings/depmanager/updates/service'
 
+type UpdateChannel = 'stable' | 'nightly'
+
 type UpdateInfo = {
   currentVersion: string
+  channel: UpdateChannel
   latestVersion?: string
   available: boolean
   canInstall: boolean
@@ -27,6 +30,11 @@ function errorMessage(error: unknown) {
 
 export default function AppUpdates({ packagesBusy, onUpdating }: { packagesBusy: boolean, onUpdating: (busy: boolean) => void }) {
   const [info, setInfo] = useState<UpdateInfo | null>(null)
+  const [channel, setChannel] = useState<UpdateChannel | null>(() => {
+    const saved = readPreference('depmanager.updateChannel', '')
+    return saved === 'stable' || saved === 'nightly' ? saved : null
+  })
+  const selectedChannel = useRef(channel)
   const [checking, setChecking] = useState(false)
   const [installing, setInstalling] = useState(false)
   const [stage, setStage] = useState('Checking')
@@ -36,16 +44,26 @@ export default function AppUpdates({ packagesBusy, onUpdating }: { packagesBusy:
   const busy = useRef(false)
   const lastAutomaticAttempt = useRef(readPreference('depmanager.lastAutoUpdate', ''))
 
-  const check = useCallback(async () => {
+  const check = useCallback(async (requestedChannel?: UpdateChannel) => {
     if (busy.current) return
     busy.current = true
     setChecking(true)
     setStage('Checking')
     setError(null)
+    setInfo((current) => current ? { ...current, available: false, latestVersion: undefined } : current)
     setMessage('Checking GitHub releases…')
     try {
-      const result = await UpdateService.CheckForUpdates()
-      setInfo(result)
+      let nextChannel = requestedChannel ?? selectedChannel.current
+      if (!nextChannel) {
+        const current = await UpdateService.GetAppInfo()
+        setInfo(current as UpdateInfo)
+        nextChannel = current.channel as UpdateChannel
+      }
+      selectedChannel.current = nextChannel
+      setChannel(nextChannel)
+      savePreference('depmanager.updateChannel', nextChannel)
+      const result = await UpdateService.CheckForUpdates(nextChannel)
+      setInfo({ ...result, channel: nextChannel })
       setMessage(result.message)
       if (result.lastError) setError(`The previous update failed: ${result.lastError}`)
     } catch (error) {
@@ -81,10 +99,6 @@ export default function AppUpdates({ packagesBusy, onUpdating }: { packagesBusy:
   }, [onUpdating, packagesBusy])
 
   useEffect(() => {
-    let disposed = false
-    void UpdateService.GetAppInfo().then((result) => {
-      if (!disposed) setInfo((current) => current ?? result)
-    }).catch(() => { /* The check below reports connection failures. */ })
     // Defer the initial request so StrictMode cleanup cancels its first pass.
     const initialCheck = window.setTimeout(() => void check(), 0)
     const interval = window.setInterval(() => void check(), 6 * 60 * 60 * 1000)
@@ -102,7 +116,6 @@ export default function AppUpdates({ packagesBusy, onUpdating }: { packagesBusy:
       setMessage('Installing update… DepManager will restart when finished.')
     })
     return () => {
-      disposed = true
       window.clearTimeout(initialCheck)
       window.clearInterval(interval)
       removeProgress()
@@ -113,9 +126,10 @@ export default function AppUpdates({ packagesBusy, onUpdating }: { packagesBusy:
 
   useEffect(() => {
     if (!automatic || !info?.available || !info.canInstall || checking || installing || packagesBusy || error) return
-    if (lastAutomaticAttempt.current === info.latestVersion) return
+    const attempt = `${info.channel}:${info.latestVersion}`
+    if (lastAutomaticAttempt.current === attempt) return
     // Remember failed attempts across restarts to prevent an update/restart loop.
-    lastAutomaticAttempt.current = info.latestVersion ?? ''
+    lastAutomaticAttempt.current = attempt
     savePreference('depmanager.lastAutoUpdate', lastAutomaticAttempt.current)
     void install()
   }, [automatic, checking, error, info, install, installing, packagesBusy])
@@ -129,6 +143,13 @@ export default function AppUpdates({ packagesBusy, onUpdating }: { packagesBusy:
         {error && <span className="app-update-error" role="alert">{error}</span>}
       </div>
       <div className="app-update-controls">
+        <label className="update-channel-option">
+          Update channel
+          <select aria-label="Update channel" value={channel ?? 'stable'} disabled={checking || installing || !channel} onChange={(event) => void check(event.target.value as UpdateChannel)}>
+            <option value="stable">Stable</option>
+            <option value="nightly">Nightly</option>
+          </select>
+        </label>
         <label className="auto-update-option">
           <input type="checkbox" checked={automatic} disabled={installing || !info?.canInstall} onChange={(event) => {
             setAutomatic(event.target.checked)
