@@ -58,6 +58,10 @@ jobs:
             echo "No code changes since ${baseline}; version bump and release skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Validate curated release notes
+        if: steps.changes.outputs.changed == 'true'
+        run: node updates/changelog.cjs notes > "${RUNNER_TEMP}/release-notes.md"
+
       - name: Set channel version and tag the release
         id: bump
         if: steps.changes.outputs.changed == 'true'
@@ -171,11 +175,22 @@ jobs:
     needs: [version, build]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.commit }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
           path: release-assets
           merge-multiple: true
+
+      - name: Read curated release notes
+        run: node updates/changelog.cjs notes > "${RUNNER_TEMP}/release-notes.md"
 
       - name: Publish GitHub release
         env:
@@ -192,5 +207,32 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --title "DepManager ${CHANNEL^} v${VERSION}" \
             "${release_flags[@]}" \
-            --generate-notes \
+            --notes-file "${RUNNER_TEMP}/release-notes.md" \
             --verify-tag
+
+      - name: Record the published release in CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          release_date="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" --jq '.published_at[0:10]')"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          recorded=false
+          for attempt in 1 2 3; do
+            git fetch origin "${RELEASE_BRANCH}"
+            git checkout -B "${RELEASE_BRANCH}" "origin/${RELEASE_BRANCH}"
+            node updates/changelog.cjs record "${VERSION}" "${release_date}" "${RELEASE_BRANCH}" "${RUNNER_TEMP}/release-notes.md"
+            git add CHANGELOG.md
+            if git diff --cached --quiet; then
+              recorded=true
+              break
+            fi
+            git commit -m "docs(changelog): v${VERSION} [skip ci]"
+            if git push origin "HEAD:${RELEASE_BRANCH}"; then
+              recorded=true
+              break
+            fi
+          done
+          [ "${recorded}" = "true" ]

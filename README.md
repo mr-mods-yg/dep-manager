@@ -14,7 +14,7 @@ A desktop app for viewing and managing global JavaScript packages across **npm, 
 
 ## Install
 
-Download a build from [GitHub Releases](https://github.com/mr-mods-yg/dep-manager/releases/latest).
+Download a build from [GitHub Releases](https://github.com/mr-mods-yg/dep-manager/releases).
 
 | Platform | Release asset | Installation |
 | --- | --- | --- |
@@ -122,6 +122,7 @@ wails3 generate bindings -ts -i
 | `frontend/bindings/` | Generated Wails service bindings. |
 | `build/` | Platform packaging, metadata, icons, and development configuration. |
 | `.github/workflows/release.yml` | Version bump, desktop builds, checksums, and GitHub release publication. |
+| `CHANGELOG.md` | Curated pending changes and dated release history. |
 
 ## Releases
 
@@ -132,6 +133,12 @@ The three release branches are `nightly`, `beta`, and `main` (stable). Nightly p
 The new series starts at `0.0.5-nightly.N`. Nightly advances the patch after the newest published stable or beta version: stable `1.2.0` leads to nightly `1.2.1-nightly.N`, then `1.2.2-nightly.N`. Beta advances to the next minor after stable, such as `1.3.0-beta.N`; repeated beta builds keep that version and advance the build suffix. The initial beta is `0.1.0-beta.N`. Stable starts at `1.0.0` and promotes the beta version once it is ready, such as `1.3.0`. After a beta establishes a newer minor, nightlies move to that line.
 
 The workflow commits metadata on the selected branch, tags it, tests the updater, and builds Windows and Linux packages. Nightly and beta publish GitHub **prereleases**; stable publishes a regular release. Both installers and `SHA256SUMS` are included. Windows fixed version fields and NSIS keep the numeric version required by Windows, while the app embeds the full release version.
+
+### Changelog
+
+[CHANGELOG.md](CHANGELOG.md) stores human-written release history using [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Add notable changes under `[Unreleased]`, using the relevant `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` headings. Omit empty headings.
+
+Code-changing releases require a nonempty Unreleased entry before the version is changed. The workflow uses those notes for the GitHub release. After successful publication it records the actual UTC publication date, updates comparison links, and commits the released entry to the release branch. Notes added while the build runs stay in Unreleased. Failed builds leave the notes pending, and changelog-only edits do not trigger version bumps or releases.
 
 The workflow can also be run manually against `nightly`; the same code-change check applies. It compares with a published release, so a failed build can be retried. Install the first nightly manually to switch from a stable installation to prerelease updates. Existing installations with the old `1.0.x` numbering require a manual install to move to this new version series.
 
