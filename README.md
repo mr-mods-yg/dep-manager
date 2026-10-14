@@ -127,7 +127,7 @@ wails3 generate bindings -ts -i
 
 Development and automatic releases use the `nightly` branch. Pushes to `main` do not publish releases. Pushes to `nightly` compare application source, dependencies, assets, and build scripts against the last published nightly release. Documentation and automatic version metadata changes are ignored. If there is no code change, the workflow skips the version bump, builds, and publication. The first nightly compares against the newest stable version tag when available.
 
-The three release branches are `nightly`, `beta`, and `stable`. Nightly pushes release automatically when code changes. Beta and stable builds are promoted by manually running the release workflow against their branch, using the same code-change check.
+The three release branches are `nightly`, `beta`, and `main` (stable). Nightly pushes release automatically when code changes. Beta and stable builds are promoted by manually running the release workflow against `beta` or `main`, using the same code-change check.
 
 The new series starts at `0.0.5-nightly.N`. Nightly advances the patch after the newest published stable or beta version: stable `1.2.0` leads to nightly `1.2.1-nightly.N`, then `1.2.2-nightly.N`. Beta advances to the next minor after stable, such as `1.3.0-beta.N`; repeated beta builds keep that version and advance the build suffix. The initial beta is `0.1.0-beta.N`. Stable starts at `1.0.0` and promotes the beta version once it is ready, such as `1.3.0`. After a beta establishes a newer minor, nightlies move to that line.
 
