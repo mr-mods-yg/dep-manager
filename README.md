@@ -136,13 +136,15 @@ Releases follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)
 
 | Channel | Branch | Example version |
 | --- | --- | --- |
-| Nightly | `nightly` | `1.0.0-alpha.1`, `1.0.0-alpha.2` |
-| Beta | `beta` | `1.0.0-beta.1`, `1.0.0-beta.2` |
-| Stable | `main` | `1.0.0` |
+| Nightly | `nightly` | `0.1.0-alpha.1`, `0.1.0-alpha.2` |
+| Beta | `beta` | `0.1.0-beta.1`, `0.1.0-beta.2` |
+| Stable | `main` | `0.1.0` |
 
 Nightly uses the `alpha` identifier because SemVer orders `alpha` before `beta`; the channel remains named Nightly. All stages keep the same numeric target. Prerelease counters are independent per target/channel and come from reserved tags, rather than workflow run numbers. A new target starts its counters at 1. A failed tagged build reserves its counter, while skipped runs do not consume one. Existing published nightly versions keep their original names and remain recognized by the updater.
 
-The first planned stable target is `1.0.0`. After stable `1.2.0`, choose `1.2.1` for compatible fixes, `1.3.0` for compatible features or deprecations, or `2.0.0` for incompatible changes. Increase the relevant component and reset lower components to zero. Version targets are explicit because a build script cannot determine whether a change breaks compatibility. Changing the plan alone does not publish a release, and a published stable target cannot be reused.
+The initial development target is `0.1.0`. During initial development, use `0.1.1` for fixes and `0.2.0` for features or breaking development changes. The Stable channel identifies a release without a prerelease suffix; major-zero releases still have a development API. Publishing from main does not automatically advance to `1.0.0`. Make that transition deliberately when the app and its compatibility contract are ready.
+
+After reaching `1.0.0`, use PATCH for compatible fixes, MINOR for compatible features or deprecations, and MAJOR for incompatible changes. Reset lower components to zero when increasing a higher component. Version targets are explicit because a build script cannot determine whether a change breaks compatibility. Changing the plan alone does not publish a release, and a published stable target cannot be reused.
 
 DepManager's public compatibility contract covers documented package actions and manager support, saved settings, and the update protocol (version/channel metadata, platform asset names, and SHA256SUMS). `1.0.0` establishes that contract; major-zero versions are initial development. Keep released binaries and tags immutable, and publish changed contents under a new version.
 
@@ -154,6 +156,6 @@ The workflow commits metadata on the selected branch, tags it, tests the updater
 
 Code-changing releases require a nonempty Unreleased entry before the version is changed. The workflow uses those notes for the GitHub release. After successful publication it records the actual UTC publication date, updates comparison links, and commits the released entry to the release branch. Notes added while the build runs stay in Unreleased. Failed builds leave the notes pending, and changelog-only edits do not trigger version bumps or releases.
 
-The workflow can also be run manually against `nightly`; the same code-change check applies. It compares with a published release, so a failed build can be retried. Install the first nightly manually to switch from a stable installation to prerelease updates. Existing installations with the old `1.0.x` numbering require a manual install to move to this new version series.
+The workflow can also be run manually against `nightly`; the same code-change check applies. It compares with a published release, so a failed build can be retried. Install the first nightly manually to switch from a stable installation to prerelease updates. Existing installations with the old `1.0.x` numbering, including the withdrawn `1.0.0-alpha.1`, require a manual install to move to this major-zero version series because automatic updates do not downgrade.
 
 The app embeds its version from `frontend/package.json`, keeping update comparisons aligned with release tags. Older installed versions that predate the in-app updater need a manual upgrade to a release containing this feature first.

@@ -11,8 +11,9 @@
 
 Follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
-- `updates/release-plan.json` declares the next target as plain `MAJOR.MINOR.PATCH`. The first target is `1.0.0`.
-- All stages of one release use the same target: Nightly `1.0.0-alpha.1`, Beta `1.0.0-beta.1`, Stable `1.0.0`.
+- `updates/release-plan.json` declares the next target as plain `MAJOR.MINOR.PATCH`. The initial development target is `0.1.0`.
+- All stages of one release use the same target: Nightly `0.1.0-alpha.1`, Beta `0.1.0-beta.1`, Stable `0.1.0`.
+- Keep MAJOR at zero during initial development. Publishing from main removes the prerelease suffix; it must not force the version to `1.0.0`. Establish `1.0.0` deliberately when the app and its compatibility contract are ready.
 - The Nightly channel uses `alpha` in version identifiers because SemVer sorts it before `beta`. Retain the name Nightly in the app, branch, and GitHub release titles.
 - Increment PATCH for compatible bug fixes, MINOR for compatible features or deprecations, and MAJOR for incompatible public behavior/API changes. Reset lower components when increasing a higher component. Choose the target explicitly; do not infer semantic impact from the branch name or workflow run count.
 - The compatibility contract covers documented package actions/manager support, saved settings, and the update protocol (version/channel metadata, platform asset names, and SHA256SUMS). Version `1.0.0` establishes this contract. Major-zero versions indicate initial development.

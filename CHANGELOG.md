@@ -8,7 +8,16 @@ This history starts with the reset prerelease series.
 
 ## [Unreleased]
 
-## [1.0.0-alpha.1] - 2026-10-14
+### Added
+
+- A Beta option alongside Stable and Nightly for automatic and manual application updates.
+
+### Fixed
+
+- Start the SemVer development cycle at 0.1.0 across Nightly, Beta, and Stable instead of prematurely targeting 1.0.0.
+- Document that promoting a release to main preserves its target version, including major-zero development versions.
+
+## [1.0.0-alpha.1] - 2026-10-14 [YANKED]
 
 ### Added
 
