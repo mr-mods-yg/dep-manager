@@ -1,4 +1,4 @@
-package main
+package packages
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-const packageProgressEvent = "package:progress"
+const ProgressEvent = "package:progress"
 
 type PackageActionProgress struct {
 	Manager     string `json:"manager"`

@@ -119,7 +119,7 @@ wails3 generate bindings -ts -i
 | Path | Purpose |
 | --- | --- |
 | `main.go` | Desktop window, service registration, and embedded app version/assets. |
-| `packageservice.go` | Manager discovery, installed-version recovery, and package actions. |
+| `packages/` | Manager discovery, package actions, command helpers, progress handling, and tests. |
 | `updates/` | Update service, platform installation helpers, build-mode controls, tests, and release version script. |
 | `updates/release-plan.json` | The next release's explicit SemVer target, shared by nightly and stable. |
 | `AGENTS.md` | Repository rules for branches, versioning, updates, changelogs, and verification. |

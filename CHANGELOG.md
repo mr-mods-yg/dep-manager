@@ -9,6 +9,10 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 
 ## [Unreleased]
 
+### Changed
+
+- Organize package manager services, command helpers, progress handling, and tests under `packages/`.
+
 ## [0.0.2] - 2026-10-14
 
 ### Added
