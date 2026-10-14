@@ -81,8 +81,18 @@ test('reject invalid dates, versions and branches', () => {
   for (const date of ['15-10-2026', '2026-02-31', '2026-99-99']) {
     assert.throws(() => recordRelease(source, { ...options, date }), /valid YYYY-MM-DD/);
   }
-  assert.throws(() => recordRelease(source, { ...options, version: 'bad]version' }), /Invalid release version/);
+  for (const version of ['bad]version', '01.0.0', '1.0.0-alpha.01', '1.0.0+', '1.0.0-']) {
+    assert.throws(() => recordRelease(source, { ...options, version }), /Invalid release version/);
+  }
   assert.throws(() => recordRelease(source, { ...options, branch: 'stable' }), /Invalid release branch/);
+});
+
+test('record SemVer prereleases and preserve build metadata in release links', () => {
+  const version = '1.0.0-alpha.1+build.42';
+  const recorded = recordRelease(source, { ...options, version });
+  assert.ok(recorded.includes('## [' + version + '] - ' + options.date));
+  assert.ok(recorded.includes('...v' + version));
+  assert.ok(releaseNotes(recorded, version).includes('A new feature.'));
 });
 
 test('editing and recording only changelog notes never starts another build', (t) => {

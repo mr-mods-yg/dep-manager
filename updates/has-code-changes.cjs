@@ -2,7 +2,7 @@ const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 
 function isBuildInput(file) {
-  if (file.endsWith('.md')) return false;
+  if (file.endsWith('.md') || file === 'updates/release-plan.json') return false;
   return /^[^/]+\.go$/.test(file)
     || ['go.mod', 'go.sum', 'Taskfile.yml'].includes(file)
     || file.startsWith('updates/')

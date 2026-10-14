@@ -1,43 +1,46 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { parseVersion, compareVersions } = require('./semver.cjs');
 
-function bumpVersion(root, nightlyNumber, options = {}) {
-  if (nightlyNumber !== undefined && !/^[1-9]\d*$/.test(String(nightlyNumber))) {
-    throw new Error('The nightly build number must be a positive integer');
+function nextReleaseVersion(target, channel, tags, publishedStableVersions = []) {
+  const parsed = parseVersion(target);
+  if (parsed.prerelease.length || parsed.build) throw new Error('The release target must be a plain MAJOR.MINOR.PATCH version');
+  if (parsed.core.some(part => part > 65535n)) throw new Error('The release target exceeds Windows numeric version limits');
+  if (!['nightly', 'beta', 'stable'].includes(channel)) throw new Error('Invalid release channel');
+  for (const stable of publishedStableVersions) {
+    const version = stable.replace(/^v/, '');
+    const published = parseVersion(version);
+    if (published.prerelease.length) throw new Error('Published stable versions cannot have prerelease identifiers');
+    if (compareVersions(target, version) <= 0) throw new Error('Choose a release target newer than published stable ' + version);
   }
+  const versions = tags.map(tag => tag.replace(/^v/, ''));
+  if (versions.includes(target)) throw new Error('The stable target already has a tag; choose a new release target');
+  if (channel === 'stable') return target;
+  // "alpha" sorts before "beta" in SemVer; the channel stays named Nightly.
+  const prefix = target + '-' + (channel === 'nightly' ? 'alpha' : 'beta') + '.';
+  let counter = 0n;
+  for (const version of versions) {
+    if (!version.startsWith(prefix)) continue;
+    const suffix = version.slice(prefix.length);
+    if (/^[1-9]\d*$/.test(suffix) && BigInt(suffix) > counter) counter = BigInt(suffix);
+  }
+  return prefix + (counter + 1n);
+}
+
+function bumpVersion(root, options = {}) {
+  const plan = JSON.parse(fs.readFileSync(path.join(root, 'updates/release-plan.json'), 'utf8'));
+  const channel = options.channel ?? 'nightly';
+  const tags = options.tags ?? execFileSync('git', ['tag', '--list'], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+  const version = nextReleaseVersion(plan.version, channel, tags, options.publishedStableVersions);
+  const numericVersion = plan.version;
   const configPath = 'build/config.yml';
   const config = fs.readFileSync(path.join(root, configPath), 'utf8');
   const versionPattern = /^  version: "(\d+)\.(\d+)\.(\d+)" # The application version$/m;
   const match = config.match(versionPattern);
   if (!match) throw new Error('Could not find the application version in build/config.yml');
 
-  const channel = options.channel ?? (nightlyNumber === undefined ? 'patch' : 'nightly');
-  if (!['patch', 'nightly', 'beta', 'stable'].includes(channel)) throw new Error('Invalid release channel');
-  const parse = (version) => {
-    const parts = String(version).match(/^v?(\d+)\.(\d+)\.(\d+)(?:-[\w.-]+)?$/);
-    if (!parts) throw new Error('Invalid release version: ' + version);
-    return parts.slice(1, 4).map(Number);
-  };
-  const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
-  const max = (...versions) => versions.reduce((a, b) => compare(a, b) >= 0 ? a : b);
-  const current = match.slice(1, 4).map(Number);
-  const stable = options.stableVersion ? parse(options.stableVersion) : [0, 0, 0];
-  const beta = options.betaVersion ? parse(options.betaVersion) : [0, 0, 0];
-  let next;
-  if (channel === 'nightly') {
-    const base = max(current, stable, beta);
-    next = [base[0], base[1], base[2] + 1];
-  } else if (channel === 'beta') {
-    next = max(current, [stable[0], stable[1] + 1, 0]);
-  } else if (channel === 'stable') {
-    next = max(current, beta, [1, 0, 0]);
-    if (options.stableVersion && compare(next, stable) <= 0) next = [stable[0], stable[1], stable[2] + 1];
-  } else {
-    next = [current[0], current[1], current[2] + 1];
-  }
   // Windows fixed version fields and NSIS require a numeric version.
-  const numericVersion = next.join('.');
-  const version = numericVersion + (['nightly', 'beta'].includes(channel) ? '-' + channel + '.' + nightlyNumber : '');
   const files = new Map([[configPath, config.replace(versionPattern, '  version: "' + numericVersion + '" # The application version')]]);
 
   function setJsonVersion(filePath, update) {
@@ -47,7 +50,7 @@ function bumpVersion(root, nightlyNumber, options = {}) {
   }
   setJsonVersion('frontend/package.json', (data) => {
     data.version = version;
-    if (channel !== 'patch') data.releaseChannel = channel;
+    data.releaseChannel = channel;
   });
   setJsonVersion('frontend/package-lock.json', (data) => {
     data.version = version;
@@ -77,14 +80,13 @@ function bumpVersion(root, nightlyNumber, options = {}) {
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  if (args.length && (args.length !== 2 || !['--nightly', '--beta', '--stable'].includes(args[0]))) {
-    throw new Error('Usage: node updates/bump-version.cjs [--nightly|--beta|--stable BUILD_NUMBER]');
+  if (args.length !== 1 || !['--nightly', '--beta', '--stable'].includes(args[0])) {
+    throw new Error('Usage: node updates/bump-version.cjs --nightly|--beta|--stable');
   }
-  process.stdout.write(bumpVersion(path.resolve(__dirname, '..'), args[1], {
-    channel: args[0]?.slice(2),
-    stableVersion: process.env.STABLE_VERSION || undefined,
-    betaVersion: process.env.BETA_VERSION || undefined,
+  process.stdout.write(bumpVersion(path.resolve(__dirname, '..'), {
+    channel: args[0].slice(2),
+    publishedStableVersions: JSON.parse(process.env.PUBLISHED_STABLE_VERSIONS || '[]'),
   }) + '\n');
 }
 
-module.exports = { bumpVersion };
+module.exports = { bumpVersion, nextReleaseVersion };

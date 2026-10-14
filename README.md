@@ -35,7 +35,7 @@ Bun packages are read from its configured global directory, including `BUN_INSTA
 
 ## Application updates
 
-The update panel below the package list shows the running app version and a **Check for updates** button. Choose **Stable** or **Nightly** with the **Update channel** selector. The selection is saved locally and controls both automatic updates and **Update now**. Stable checks published stable releases; Nightly includes prereleases. Stable builds default to Stable, and nightly builds default to Nightly on the first launch. Changing channels immediately checks that channel and clears the previous update offer. DepManager also checks on startup and every six hours while the app stays open.
+The update panel below the package list shows the running app version and a **Check for updates** button. Choose **Stable**, **Beta**, or **Nightly** with the **Update channel** selector. The selection is saved locally and controls both automatic updates and **Update now**. Stable checks stable releases; Beta includes beta and stable releases; Nightly includes nightly, beta, and stable releases. Each build defaults to its own channel on first launch. The highest eligible SemVer version is offered, even when GitHub lists releases in a different order. Changing channels immediately checks that channel and clears the previous update offer. Switching to a channel with an older version does not downgrade the app. DepManager also checks on startup and every six hours while the app stays open.
 
 **Automatically install updates** is enabled by default for supported production builds. Turn it off to review available releases and use **Update now** when ready. The preference is saved locally.
 
@@ -117,6 +117,8 @@ wails3 generate bindings -ts -i
 | `main.go` | Desktop window, service registration, and embedded app version/assets. |
 | `packageservice.go` | Manager discovery, installed-version recovery, and package actions. |
 | `updates/` | Update service, platform installation helpers, build-mode controls, tests, and release version script. |
+| `updates/release-plan.json` | The next release's explicit SemVer target, shared by nightly, beta, and stable. |
+| `AGENTS.md` | Repository rules for branches, versioning, updates, changelogs, and verification. |
 | `frontend/src/` | React interface and application update controls. |
 | `frontend/public/style.css` | App styling and loading animations. |
 | `frontend/bindings/` | Generated Wails service bindings. |
@@ -130,7 +132,19 @@ Development and automatic releases use the `nightly` branch. Pushes to `main` do
 
 The three release branches are `nightly`, `beta`, and `main` (stable). Nightly pushes release automatically when code changes. Beta and stable builds are promoted by manually running the release workflow against `beta` or `main`, using the same code-change check.
 
-The new series starts at `0.0.5-nightly.N`. Nightly advances the patch after the newest published stable or beta version: stable `1.2.0` leads to nightly `1.2.1-nightly.N`, then `1.2.2-nightly.N`. Beta advances to the next minor after stable, such as `1.3.0-beta.N`; repeated beta builds keep that version and advance the build suffix. The initial beta is `0.1.0-beta.N`. Stable starts at `1.0.0` and promotes the beta version once it is ready, such as `1.3.0`. After a beta establishes a newer minor, nightlies move to that line.
+Releases follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Set the next target in `updates/release-plan.json` and carry that target through the three stages:
+
+| Channel | Branch | Example version |
+| --- | --- | --- |
+| Nightly | `nightly` | `1.0.0-alpha.1`, `1.0.0-alpha.2` |
+| Beta | `beta` | `1.0.0-beta.1`, `1.0.0-beta.2` |
+| Stable | `main` | `1.0.0` |
+
+Nightly uses the `alpha` identifier because SemVer orders `alpha` before `beta`; the channel remains named Nightly. All stages keep the same numeric target. Prerelease counters are independent per target/channel and come from reserved tags, rather than workflow run numbers. A new target starts its counters at 1. A failed tagged build reserves its counter, while skipped runs do not consume one. Existing published nightly versions keep their original names and remain recognized by the updater.
+
+The first planned stable target is `1.0.0`. After stable `1.2.0`, choose `1.2.1` for compatible fixes, `1.3.0` for compatible features or deprecations, or `2.0.0` for incompatible changes. Increase the relevant component and reset lower components to zero. Version targets are explicit because a build script cannot determine whether a change breaks compatibility. Changing the plan alone does not publish a release, and a published stable target cannot be reused.
+
+DepManager's public compatibility contract covers documented package actions and manager support, saved settings, and the update protocol (version/channel metadata, platform asset names, and SHA256SUMS). `1.0.0` establishes that contract; major-zero versions are initial development. Keep released binaries and tags immutable, and publish changed contents under a new version.
 
 The workflow commits metadata on the selected branch, tags it, tests the updater, and builds Windows and Linux packages. Nightly and beta publish GitHub **prereleases**; stable publishes a regular release. Both installers and `SHA256SUMS` are included. Windows fixed version fields and NSIS keep the numeric version required by Windows, while the app embeds the full release version.
 
