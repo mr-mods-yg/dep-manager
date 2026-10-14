@@ -21,7 +21,7 @@ function fixture(t) {
     fs.writeFileSync(path.join(root, file), content);
   };
   for (const file of metadata) write(file, fs.readFileSync(path.join(__dirname, '..', file)));
-  write('updates/release-plan.json', JSON.stringify({ version: '1.0.0' }));
+  write('updates/release-plan.json', JSON.stringify({ version: '0.1.0' }));
   // Exercise the same starting version on every release branch.
   write('build/config.yml', fs.readFileSync(path.join(root, 'build/config.yml'), 'utf8').replace(/^  version: "[^"]+" # The application version$/m, '  version: "0.0.4" # The application version'));
   write('app.go', 'package main\n');
@@ -41,22 +41,22 @@ function fixture(t) {
 test('nightly app, Debian, Windows and NSIS versions stay compatible', (t) => {
   const f = fixture(t);
   const version = bumpVersion(f.root);
-  assert.equal(version, '1.0.0-alpha.1');
+  assert.equal(version, '0.1.0-alpha.1');
   assert.equal(f.json('frontend/package.json').version, version);
   assert.equal(f.json('frontend/package-lock.json').packages[''].version, version);
   assert.equal(f.json('frontend/package.json').releaseChannel, 'nightly');
-  assert.equal(f.json('build/windows/info.json').fixed.file_version, '1.0.0');
+  assert.equal(f.json('build/windows/info.json').fixed.file_version, '0.1.0');
   assert.equal(f.json('build/windows/info.json').info['0000'].ProductVersion, version);
-  assert.ok(f.read('build/config.yml').includes('version: "1.0.0"'));
+  assert.ok(f.read('build/config.yml').includes('version: "0.1.0"'));
   assert.ok(f.read('build/linux/nfpm/nfpm.yaml').includes('version: "' + version + '"'));
-  assert.ok(f.read('build/windows/nsis/wails_tools.nsh').includes('INFO_PRODUCTVERSION "1.0.0"'));
+  assert.ok(f.read('build/windows/nsis/wails_tools.nsh').includes('INFO_PRODUCTVERSION "0.1.0"'));
   f.git('tag', 'v' + version);
-  assert.equal(bumpVersion(f.root), '1.0.0-alpha.2');
+  assert.equal(bumpVersion(f.root), '0.1.0-alpha.2');
 });
 
-test('stable removes the prerelease suffix from the planned target', (t) => {
+test('stable removes the prerelease suffix without forcing a major-one release', (t) => {
   const f = fixture(t);
-  assert.equal(bumpVersion(f.root, { channel: 'stable' }), '1.0.0');
+  assert.equal(bumpVersion(f.root, { channel: 'stable' }), '0.1.0');
   assert.equal(f.json('frontend/package.json').releaseChannel, 'stable');
 });
 
