@@ -8,6 +8,8 @@ This history starts with the reset prerelease series.
 
 ## [Unreleased]
 
+## [0.0.6-nightly.8] - 2026-10-14
+
 ### Added
 
 - A repository changelog with categorized, dated release history.
@@ -38,5 +40,6 @@ This history starts with the reset prerelease series.
 - Preserve installation and restart errors for the next application launch.
 - Clear the previous update offer when switching update channels.
 
-[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.5-nightly.5...nightly
+[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.6-nightly.8...nightly
+[0.0.6-nightly.8]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.5-nightly.5...v0.0.6-nightly.8
 [0.0.5-nightly.5]: https://github.com/mr-mods-yg/dep-manager/releases/tag/v0.0.5-nightly.5
