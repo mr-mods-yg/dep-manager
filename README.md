@@ -35,7 +35,7 @@ Bun packages are read from its configured global directory, including `BUN_INSTA
 
 ## Application updates
 
-The update panel below the package list shows the running app version and a **Check for updates** button. DepManager checks GitHub on startup and every six hours while the app stays open. Stable builds check stable releases; builds with a `-nightly.N` version also check prereleases.
+The update panel below the package list shows the running app version and a **Check for updates** button. Choose **Stable** or **Nightly** with the **Update channel** selector. The selection is saved locally and controls both automatic updates and **Update now**. Stable checks published stable releases; Nightly includes prereleases. Stable builds default to Stable, and nightly builds default to Nightly on the first launch. Changing channels immediately checks that channel and clears the previous update offer. DepManager also checks on startup and every six hours while the app stays open.
 
 **Automatically install updates** is enabled by default for supported production builds. Turn it off to review available releases and use **Update now** when ready. The preference is saved locally.
 
@@ -127,8 +127,12 @@ wails3 generate bindings -ts -i
 
 Development and automatic releases use the `nightly` branch. Pushes to `main` do not publish releases. Pushes to `nightly` compare application source, dependencies, assets, and build scripts against the last published nightly release. Documentation and automatic version metadata changes are ignored. If there is no code change, the workflow skips the version bump, builds, and publication. The first nightly compares against the newest stable version tag when available.
 
-When code changes, `node updates/bump-version.cjs --nightly BUILD_NUMBER` increments the patch version and adds a nightly suffix, such as `1.0.4-nightly.4`. The workflow commits the metadata change on `nightly`, tags it, tests the updater, and builds Windows and Linux packages. It publishes a GitHub **prerelease** with both installers and `SHA256SUMS`; nightly releases are not marked as the latest stable release. Windows fixed version fields and the NSIS installer keep the numeric version required by Windows, while the app embeds the full nightly version.
+The three release branches are `nightly`, `beta`, and `stable`. Nightly pushes release automatically when code changes. Beta and stable builds are promoted by manually running the release workflow against their branch, using the same code-change check.
 
-The workflow can also be run manually against `nightly`; the same code-change check applies. It compares with a published release, so a failed build can be retried. Install the first nightly manually to switch from a stable installation to prerelease updates.
+The new series starts at `0.0.5-nightly.N`. Nightly advances the patch after the newest published stable or beta version: stable `1.2.0` leads to nightly `1.2.1-nightly.N`, then `1.2.2-nightly.N`. Beta advances to the next minor after stable, such as `1.3.0-beta.N`; repeated beta builds keep that version and advance the build suffix. The initial beta is `0.1.0-beta.N`. Stable starts at `1.0.0` and promotes the beta version once it is ready, such as `1.3.0`. After a beta establishes a newer minor, nightlies move to that line.
+
+The workflow commits metadata on the selected branch, tags it, tests the updater, and builds Windows and Linux packages. Nightly and beta publish GitHub **prereleases**; stable publishes a regular release. Both installers and `SHA256SUMS` are included. Windows fixed version fields and NSIS keep the numeric version required by Windows, while the app embeds the full release version.
+
+The workflow can also be run manually against `nightly`; the same code-change check applies. It compares with a published release, so a failed build can be retried. Install the first nightly manually to switch from a stable installation to prerelease updates. Existing installations with the old `1.0.x` numbering require a manual install to move to this new version series.
 
 The app embeds its version from `frontend/package.json`, keeping update comparisons aligned with release tags. Older installed versions that predate the in-app updater need a manual upgrade to a release containing this feature first.

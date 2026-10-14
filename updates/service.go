@@ -20,6 +20,7 @@ const releaseRepository = "mr-mods-yg/dep-manager"
 
 type AppUpdateInfo struct {
 	CurrentVersion   string `json:"currentVersion"`
+	Channel          string `json:"channel"`
 	LatestVersion    string `json:"latestVersion,omitempty"`
 	Available        bool   `json:"available"`
 	CanInstall       bool   `json:"canInstall"`
@@ -30,22 +31,35 @@ type AppUpdateInfo struct {
 }
 
 type Service struct {
-	version    string
-	canInstall bool
-	operations *sync.RWMutex
-	installer  func(context.Context, string, string) error
-	updater    *updater.Updater
-	quit       func()
-	mu         sync.Mutex
-	installing bool
+	version          string
+	defaultChannel   string
+	canInstall       bool
+	operations       *sync.RWMutex
+	installer        func(context.Context, string, string) error
+	updater          *updater.Updater
+	provider         *channelProvider
+	quit             func()
+	mu               sync.Mutex
+	installing       bool
+	availableChannel string
 }
 
-func New(version string, operations *sync.RWMutex) *Service {
+func New(version string, operations *sync.RWMutex, channels ...string) *Service {
+	channel := defaultUpdateChannel(version)
+	if len(channels) > 0 {
+		switch channels[0] {
+		case "stable", "nightly":
+			channel = channels[0]
+		case "beta":
+			channel = "nightly"
+		}
+	}
 	return &Service{
-		version:    version,
-		canInstall: appUpdatesEnabled && (runtime.GOOS == "windows" || runtime.GOOS == "linux") && runtime.GOARCH == "amd64",
-		operations: operations,
-		installer:  installAppUpdate,
+		version:        version,
+		defaultChannel: channel,
+		canInstall:     appUpdatesEnabled && (runtime.GOOS == "windows" || runtime.GOOS == "linux") && runtime.GOARCH == "amd64",
+		operations:     operations,
+		installer:      installAppUpdate,
 	}
 }
 
@@ -64,12 +78,49 @@ func (p verifiedProvider) Check(ctx context.Context, req updater.CheckRequest) (
 	return release, nil
 }
 
-func releaseProviderConfig(version string) githubprovider.Config {
+type channelProvider struct {
+	updater.Provider
+	stable, nightly updater.Provider
+}
+
+func (p *channelProvider) selectChannel(channel string) error {
+	switch channel {
+	case "stable":
+		p.Provider = p.stable
+	case "nightly":
+		p.Provider = p.nightly
+	default:
+		return errors.New("choose the stable or nightly update channel")
+	}
+	return nil
+}
+
+func newChannelProvider(channel, baseURL string) (*channelProvider, error) {
+	stableConfig := releaseProviderConfig("stable")
+	stableConfig.BaseURL = baseURL
+	stable, err := githubprovider.New(stableConfig)
+	if err != nil {
+		return nil, err
+	}
+	nightlyConfig := stableConfig
+	nightlyConfig.Prerelease = true
+	nightly, err := githubprovider.New(nightlyConfig)
+	if err != nil {
+		return nil, err
+	}
+	p := &channelProvider{stable: stable, nightly: nightly}
+	if err := p.selectChannel(channel); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func releaseProviderConfig(channel string) githubprovider.Config {
 	return githubprovider.Config{
 		Repository:    releaseRepository,
 		ChecksumAsset: "SHA256SUMS",
 		AssetMatcher:  matchUpdateAsset,
-		Prerelease:    isNightlyVersion(version),
+		Prerelease:    channel == "nightly",
 	}
 }
 
@@ -77,8 +128,15 @@ func isNightlyVersion(version string) bool {
 	return strings.Contains(version, "-nightly.")
 }
 
+func defaultUpdateChannel(version string) string {
+	if isNightlyVersion(version) {
+		return "nightly"
+	}
+	return "stable"
+}
+
 func Configure(s *Service, runtimeUpdater *updater.Updater, quit func()) error {
-	provider, err := githubprovider.New(releaseProviderConfig(s.version))
+	provider, err := newChannelProvider(s.defaultChannel, "")
 	if err != nil {
 		return err
 	}
@@ -90,6 +148,7 @@ func Configure(s *Service, runtimeUpdater *updater.Updater, quit func()) error {
 		return err
 	}
 	s.updater = runtimeUpdater
+	s.provider = provider
 	s.quit = quit
 	return nil
 }
@@ -114,12 +173,13 @@ func matchUpdateAsset(req updater.CheckRequest, assets []githubprovider.ReleaseA
 func (s *Service) GetAppInfo() AppUpdateInfo {
 	info := AppUpdateInfo{
 		CurrentVersion:   s.version,
+		Channel:          s.defaultChannel,
 		CanInstall:       s.canInstall,
 		DevelopmentBuild: !appUpdatesEnabled,
 		Message:          "Checks GitHub for the latest stable release.",
 		ReleaseURL:       "https://github.com/" + releaseRepository + "/releases/latest",
 	}
-	if isNightlyVersion(s.version) {
+	if s.defaultChannel == "nightly" {
 		info.Message = "Checks GitHub for the latest nightly prerelease."
 		info.ReleaseURL = "https://github.com/" + releaseRepository + "/releases"
 	}
@@ -134,7 +194,7 @@ func (s *Service) GetAppInfo() AppUpdateInfo {
 	return info
 }
 
-func (s *Service) CheckForUpdates() (AppUpdateInfo, error) {
+func (s *Service) CheckForUpdates(channel string) (AppUpdateInfo, error) {
 	info := s.GetAppInfo()
 	if !s.mu.TryLock() {
 		return info, errors.New("an update operation is already running")
@@ -143,14 +203,29 @@ func (s *Service) CheckForUpdates() (AppUpdateInfo, error) {
 	if s.installing {
 		return info, errors.New("the application is restarting to finish an update")
 	}
+	// The framework retains its pending release after an unsuccessful check.
+	// Invalidate that offer before changing channels or checking again.
+	s.availableChannel = ""
+	if channel == "" {
+		channel = s.defaultChannel
+	}
+	if err := s.provider.selectChannel(channel); err != nil {
+		return info, err
+	}
+	info.Channel = channel
+	info.ReleaseURL = "https://github.com/" + releaseRepository + "/releases"
+	if channel == "stable" {
+		info.ReleaseURL += "/latest"
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	release, err := s.updater.Check(ctx)
 	if err != nil {
 		return info, fmt.Errorf("could not check GitHub releases: %w", err)
 	}
-	info.Message = "You're using the latest available version."
+	info.Message = "No newer " + channel + " release is available."
 	if release != nil {
+		s.availableChannel = channel
 		info.LatestVersion = release.Version
 		info.Available = true
 		info.Message = "DepManager " + release.Version + " is available."
@@ -174,6 +249,9 @@ func (s *Service) InstallUpdate() error {
 	defer s.mu.Unlock()
 	if s.installing {
 		return errors.New("the application is already restarting")
+	}
+	if s.availableChannel == "" {
+		return errors.New("check for updates in the selected channel before installing")
 	}
 	if s.operations != nil {
 		if !s.operations.TryLock() {

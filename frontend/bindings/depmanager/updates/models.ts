@@ -3,6 +3,7 @@
 
 export interface AppUpdateInfo {
     "currentVersion": string;
+    "channel": string;
     "latestVersion"?: string;
     "available": boolean;
     "canInstall": boolean;

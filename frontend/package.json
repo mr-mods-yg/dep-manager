@@ -1,7 +1,7 @@
 {
   "name": "depmanager",
   "private": true,
-  "version": "1.0.4-nightly.4",
+  "version": "0.0.4-nightly.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,5 +20,6 @@
     "@vitejs/plugin-react": "^6.0.0",
     "typescript": "^5.2.2",
     "vite": "^8.0.5"
-  }
+  },
+  "releaseChannel": "nightly"
 }

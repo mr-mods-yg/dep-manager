@@ -18,14 +18,15 @@ var appPackageJSON []byte
 
 func main() {
 	var manifest struct {
-		Version string `json:"version"`
+		Version        string `json:"version"`
+		ReleaseChannel string `json:"releaseChannel"`
 	}
 	if err := json.Unmarshal(appPackageJSON, &manifest); err != nil || manifest.Version == "" {
 		log.Fatal("application version is missing from frontend/package.json")
 	}
 	operations := &sync.RWMutex{}
 	packageService := &PackageService{operations: operations}
-	updateService := updates.New(manifest.Version, operations)
+	updateService := updates.New(manifest.Version, operations, manifest.ReleaseChannel)
 	app := application.New(application.Options{
 		Name:        "DepManager",
 		Description: "Manage global JavaScript packages",

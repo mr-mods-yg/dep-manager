@@ -27,6 +27,7 @@ function normalise(file, content) {
       delete data.info['0000'].ProductVersion;
     } else {
       delete data.version;
+      delete data.releaseChannel;
       if (file.endsWith('package-lock.json')) delete data.packages[''].version;
     }
     return JSON.stringify(data);

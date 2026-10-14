@@ -97,13 +97,12 @@ func fixtureService(t *testing.T, version, checksum string, status int, currentV
 		}
 	}))
 	t.Cleanup(server.Close)
-	config := releaseProviderConfig(currentVersion)
-	config.BaseURL = server.URL
-	provider, err := githubprovider.New(config)
+	provider, err := newChannelProvider(defaultUpdateChannel(currentVersion), server.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := New(currentVersion, &sync.RWMutex{})
+	s.provider = provider
 	s.canInstall = true
 	s.updater = updater.New(testHost{})
 	if err := s.updater.Init(updater.Config{CurrentVersion: s.version, Providers: []updater.Provider{verifiedProvider{provider}}, Window: updater.WindowNone}); err != nil {
@@ -131,7 +130,7 @@ func TestCheckReleases(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			s, _ := fixtureService(t, test.tag, test.sum, test.status)
-			info, err := s.CheckForUpdates()
+			info, err := s.CheckForUpdates("")
 			if test.errorText != "" {
 				if err == nil || !strings.Contains(err.Error(), test.errorText) {
 					t.Fatalf("got %v, want %q", err, test.errorText)
@@ -161,7 +160,7 @@ func TestNightlyReleaseChecks(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			s, _ := fixtureService(t, test.latest, "valid", 200, test.current)
-			info, err := s.CheckForUpdates()
+			info, err := s.CheckForUpdates("")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -175,9 +174,55 @@ func TestNightlyReleaseChecks(t *testing.T) {
 	}
 }
 
+func TestSelectedChannelOverridesBuildChannel(t *testing.T) {
+	for _, test := range []struct{ current, selected, latest string }{
+		{"1.0.3", "nightly", "v1.0.4-nightly.1"},
+		{"1.0.4-nightly.1", "stable", "v1.0.5"},
+	} {
+		t.Run(test.selected, func(t *testing.T) {
+			s, _ := fixtureService(t, test.latest, "valid", 200, test.current)
+			info, err := s.CheckForUpdates(test.selected)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !info.Available || info.Channel != test.selected || s.availableChannel != test.selected {
+				t.Fatalf("selected channel was not used: %+v", info)
+			}
+		})
+	}
+}
+
+func TestChannelSwitchInvalidatesPreviousOffer(t *testing.T) {
+	s, _ := fixtureService(t, "v1.0.4-nightly.1", "valid", 200, "1.0.3")
+	info, err := s.CheckForUpdates("nightly")
+	if err != nil || !info.Available {
+		t.Fatalf("nightly was not offered: %+v, %v", info, err)
+	}
+	info, err = s.CheckForUpdates("stable")
+	if err != nil || info.Available {
+		t.Fatalf("stable channel retained the nightly offer: %+v, %v", info, err)
+	}
+	if err := s.InstallUpdate(); err == nil || !strings.Contains(err.Error(), "selected channel") {
+		t.Fatalf("stale nightly update could still be installed: %v", err)
+	}
+}
+
+func TestFailedChannelCheckInvalidatesPreviousOffer(t *testing.T) {
+	s, _ := fixtureService(t, "v1.1.0", "valid", 200)
+	if _, err := s.CheckForUpdates("stable"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CheckForUpdates("invalid"); err == nil {
+		t.Fatal("invalid channel was accepted")
+	}
+	if err := s.InstallUpdate(); err == nil {
+		t.Fatal("previous offer remained installable after a failed check")
+	}
+}
+
 func TestInstallVerifiesBeforeInstallerAndRestarts(t *testing.T) {
 	s, payload := fixtureService(t, "v1.1.0", "valid", 200)
-	if _, err := s.CheckForUpdates(); err != nil {
+	if _, err := s.CheckForUpdates(""); err != nil {
 		t.Fatal(err)
 	}
 	called := false
@@ -210,7 +255,7 @@ func TestInstallVerifiesBeforeInstallerAndRestarts(t *testing.T) {
 
 func TestInstallRejectsCorruptDownload(t *testing.T) {
 	s, _ := fixtureService(t, "v1.1.0", strings.Repeat("0", 64), 200)
-	if _, err := s.CheckForUpdates(); err != nil {
+	if _, err := s.CheckForUpdates(""); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.InstallUpdate(); err == nil || !strings.Contains(err.Error(), "digest mismatch") {
@@ -224,7 +269,7 @@ func TestInstallRejectsCorruptDownload(t *testing.T) {
 
 func TestInstallFailureKeepsAppOpenAndAllowsRetry(t *testing.T) {
 	s, _ := fixtureService(t, "v1.1.0", "valid", 200)
-	if _, err := s.CheckForUpdates(); err != nil {
+	if _, err := s.CheckForUpdates(""); err != nil {
 		t.Fatal(err)
 	}
 	s.installer = func(context.Context, string, string) error { return errors.New("cancelled") }
@@ -242,6 +287,9 @@ func TestInstallFailureKeepsAppOpenAndAllowsRetry(t *testing.T) {
 
 func TestUpdateWaitsForPackageWork(t *testing.T) {
 	s, _ := fixtureService(t, "v1.1.0", "valid", 200)
+	if _, err := s.CheckForUpdates(""); err != nil {
+		t.Fatal(err)
+	}
 	s.operations.RLock()
 	defer s.operations.RUnlock()
 	if err := s.InstallUpdate(); err == nil || !strings.Contains(err.Error(), "package operations") {

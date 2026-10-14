@@ -20,6 +20,8 @@ function fixture(t) {
     fs.writeFileSync(path.join(root, file), content);
   };
   for (const file of metadata) write(file, fs.readFileSync(path.join(__dirname, '..', file)));
+  // Exercise the same starting version on every release branch.
+  write('build/config.yml', fs.readFileSync(path.join(root, 'build/config.yml'), 'utf8').replace(/^  version: "[^"]+" # The application version$/m, '  version: "0.0.4" # The application version'));
   write('app.go', 'package main\n');
   write('frontend/src/App.tsx', 'export default function App() { return null }\n');
   write('README.md', '# DepManager\n');
@@ -132,4 +134,32 @@ test('a missing first baseline builds once and invalid baselines fail closed', (
   const f = fixture(t);
   assert.ok(findCodeChanges(f.root, '').length > 0);
   assert.throws(() => findCodeChanges(f.root, 'invalid-release-tag'));
+});
+
+test('nightly starts after the newest stable release', (t) => {
+  const f = fixture(t);
+  assert.equal(bumpVersion(f.root, 42, { channel: 'nightly', stableVersion: 'v1.2.0' }), '1.2.1-nightly.42');
+  assert.equal(bumpVersion(f.root, 43, { channel: 'nightly', stableVersion: 'v1.2.0' }), '1.2.2-nightly.43');
+});
+
+test('beta advances the stable minor and keeps its beta line', (t) => {
+  const f = fixture(t);
+  assert.equal(bumpVersion(f.root, 42, { channel: 'beta', stableVersion: 'v1.2.0' }), '1.3.0-beta.42');
+  assert.equal(bumpVersion(f.root, 43, { channel: 'beta', stableVersion: 'v1.2.0' }), '1.3.0-beta.43');
+});
+
+test('stable promotes beta and the first stable is 1.0.0', (t) => {
+  const f = fixture(t);
+  assert.equal(bumpVersion(f.root, 42, { channel: 'stable', betaVersion: 'v0.1.0-beta.41' }), '1.0.0');
+  assert.equal(bumpVersion(f.root, 43, { channel: 'stable', stableVersion: 'v1.2.0', betaVersion: 'v1.3.0-beta.42' }), '1.3.0');
+});
+
+test('nightly moves to the new beta minor', (t) => {
+  const f = fixture(t);
+  assert.equal(bumpVersion(f.root, 42, { channel: 'nightly', stableVersion: 'v1.2.0', betaVersion: 'v1.3.0-beta.41' }), '1.3.1-nightly.42');
+});
+
+test('the initial beta is 0.1.0', (t) => {
+  const f = fixture(t);
+  assert.equal(bumpVersion(f.root, 42, { channel: 'beta' }), '0.1.0-beta.42');
 });
