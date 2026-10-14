@@ -1,10 +1,10 @@
 {
   "fixed": {
-    "file_version": "1.0.0"
+    "file_version": "0.0.1"
   },
   "info": {
     "0000": {
-      "ProductVersion": "1.0.0-alpha.1",
+      "ProductVersion": "0.0.1-alpha.1",
       "CompanyName": "DepManager",
       "FileDescription": "Manage global JavaScript packages",
       "LegalCopyright": "(c) 2026 DepManager",
