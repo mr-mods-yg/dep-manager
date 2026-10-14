@@ -73,7 +73,7 @@ func fixtureService(t *testing.T, version, checksum string, status int, currentV
 			if checksum != "missing" {
 				assets = append(assets, map[string]any{"name": "SHA256SUMS", "browser_download_url": server.URL + "/checksums"})
 			}
-			release := map[string]any{"tag_name": version, "assets": assets, "html_url": server.URL + "/release", "prerelease": isNightlyVersion(version)}
+			release := map[string]any{"tag_name": version, "assets": assets, "html_url": server.URL + "/release", "prerelease": versionChannel(version) != "stable"}
 			if strings.HasSuffix(r.URL.Path, "/latest") {
 				if isNightlyVersion(version) {
 					w.WriteHeader(http.StatusNotFound)
@@ -157,6 +157,12 @@ func TestNightlyReleaseChecks(t *testing.T) {
 		{"older nightly", "1.0.5-nightly.2", "v1.0.4-nightly.1", false},
 		{"stable promotion", "1.0.4-nightly.1", "v1.0.4", true},
 		{"stable ignores nightly", "1.0.3", "v1.0.4-nightly.1", false},
+		{"new alpha", "1.0.0-alpha.1", "v1.0.0-alpha.2", true},
+		{"beta promotion", "1.0.0-alpha.10", "v1.0.0-beta.1", true},
+		{"beta excludes nightly", "1.0.0-beta.1", "v1.1.0-alpha.2", false},
+		{"new beta", "1.0.0-beta.1", "v1.0.0-beta.2", true},
+		{"beta to stable", "1.0.0-beta.2", "v1.0.0", true},
+		{"stable excludes beta", "0.9.0", "v1.0.0-beta.2", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			s, _ := fixtureService(t, test.latest, "valid", 200, test.current)
@@ -178,6 +184,8 @@ func TestSelectedChannelOverridesBuildChannel(t *testing.T) {
 	for _, test := range []struct{ current, selected, latest string }{
 		{"1.0.3", "nightly", "v1.0.4-nightly.1"},
 		{"1.0.4-nightly.1", "stable", "v1.0.5"},
+		{"0.9.0", "beta", "v1.0.0-beta.1"},
+		{"0.0.6-nightly.8", "nightly", "v1.0.0-alpha.1"},
 	} {
 		t.Run(test.selected, func(t *testing.T) {
 			s, _ := fixtureService(t, test.latest, "valid", 200, test.current)

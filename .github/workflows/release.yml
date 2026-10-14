@@ -44,11 +44,9 @@ jobs:
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
             | jq -s 'add' > "${RUNNER_TEMP}/channel-releases.json"
-          baseline="$(jq -r --arg channel "${CHANNEL}" 'map(select(.draft == false and (if $channel == "stable" then .prerelease == false else .prerelease == true and (.tag_name | contains("-" + $channel + ".")) end))) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
-          stable_version="$(jq -r 'map(select(.draft == false and .prerelease == false)) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
-          beta_version="$(jq -r 'map(select(.draft == false and .prerelease == true and (.tag_name | contains("-beta.")))) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
-          echo "STABLE_VERSION=${stable_version}" >> "$GITHUB_ENV"
-          echo "BETA_VERSION=${beta_version}" >> "$GITHUB_ENV"
+          baseline="$(jq -r --arg channel "${CHANNEL}" 'map(select(.draft == false and (if $channel == "stable" then .prerelease == false elif $channel == "nightly" then .prerelease == true and (.tag_name | test("-(alpha|nightly)\\.")) else .prerelease == true and (.tag_name | contains("-beta.")) end))) | .[0].tag_name // empty' "${RUNNER_TEMP}/channel-releases.json")"
+          stable_versions="$(jq -c 'map(select(.draft == false and .prerelease == false) | .tag_name)' "${RUNNER_TEMP}/channel-releases.json")"
+          echo "PUBLISHED_STABLE_VERSIONS=${stable_versions}" >> "$GITHUB_ENV"
           if [ -z "${baseline}" ]; then
             baseline="$(git tag --list 'v*' --sort=-version:refname | sed -n '/^v[0-9]*\.[0-9]*\.[0-9]*$/p' | sed -n '1p')"
           fi
@@ -67,7 +65,7 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         shell: bash
         run: |
-          version="$(node updates/bump-version.cjs "--${CHANNEL}" "${GITHUB_RUN_NUMBER}")"
+          version="$(node updates/bump-version.cjs "--${CHANNEL}")"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add build/config.yml build/windows/info.json build/windows/nsis/wails_tools.nsh build/linux/nfpm/nfpm.yaml frontend/package.json frontend/package-lock.json

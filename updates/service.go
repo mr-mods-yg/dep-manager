@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -48,10 +49,8 @@ func New(version string, operations *sync.RWMutex, channels ...string) *Service 
 	channel := defaultUpdateChannel(version)
 	if len(channels) > 0 {
 		switch channels[0] {
-		case "stable", "nightly":
+		case "stable", "beta", "nightly":
 			channel = channels[0]
-		case "beta":
-			channel = "nightly"
 		}
 	}
 	return &Service{
@@ -80,7 +79,7 @@ func (p verifiedProvider) Check(ctx context.Context, req updater.CheckRequest) (
 
 type channelProvider struct {
 	updater.Provider
-	stable, nightly updater.Provider
+	stable, beta, nightly updater.Provider
 }
 
 func (p *channelProvider) selectChannel(channel string) error {
@@ -89,26 +88,25 @@ func (p *channelProvider) selectChannel(channel string) error {
 		p.Provider = p.stable
 	case "nightly":
 		p.Provider = p.nightly
+	case "beta":
+		p.Provider = p.beta
 	default:
-		return errors.New("choose the stable or nightly update channel")
+		return errors.New("choose the stable, beta or nightly update channel")
 	}
 	return nil
 }
 
 func newChannelProvider(channel, baseURL string) (*channelProvider, error) {
-	stableConfig := releaseProviderConfig("stable")
-	stableConfig.BaseURL = baseURL
-	stable, err := githubprovider.New(stableConfig)
-	if err != nil {
-		return nil, err
+	p := &channelProvider{}
+	for name, destination := range map[string]*updater.Provider{"stable": &p.stable, "beta": &p.beta, "nightly": &p.nightly} {
+		config := releaseProviderConfig(name)
+		config.BaseURL = baseURL
+		provider, err := githubprovider.New(config)
+		if err != nil {
+			return nil, err
+		}
+		*destination = provider
 	}
-	nightlyConfig := stableConfig
-	nightlyConfig.Prerelease = true
-	nightly, err := githubprovider.New(nightlyConfig)
-	if err != nil {
-		return nil, err
-	}
-	p := &channelProvider{stable: stable, nightly: nightly}
 	if err := p.selectChannel(channel); err != nil {
 		return nil, err
 	}
@@ -120,17 +118,23 @@ func releaseProviderConfig(channel string) githubprovider.Config {
 		Repository:    releaseRepository,
 		ChecksumAsset: "SHA256SUMS",
 		AssetMatcher:  matchUpdateAsset,
-		Prerelease:    channel == "nightly",
+		// Read the release list for every channel so precedence, rather than
+		// publication order, determines which compatible release is offered.
+		Prerelease: true,
+		HTTPClient: &http.Client{
+			Transport: releaseChannelTransport{channel: channel, base: http.DefaultTransport},
+			Timeout:   30 * time.Second,
+		},
 	}
 }
 
 func isNightlyVersion(version string) bool {
-	return strings.Contains(version, "-nightly.")
+	return versionChannel(version) == "nightly"
 }
 
 func defaultUpdateChannel(version string) string {
-	if isNightlyVersion(version) {
-		return "nightly"
+	if channel := versionChannel(version); channel != "" {
+		return channel
 	}
 	return "stable"
 }
@@ -179,8 +183,8 @@ func (s *Service) GetAppInfo() AppUpdateInfo {
 		Message:          "Checks GitHub for the latest stable release.",
 		ReleaseURL:       "https://github.com/" + releaseRepository + "/releases/latest",
 	}
-	if s.defaultChannel == "nightly" {
-		info.Message = "Checks GitHub for the latest nightly prerelease."
+	if s.defaultChannel != "stable" {
+		info.Message = "Checks GitHub for the latest " + s.defaultChannel + " release or newer stable release."
 		info.ReleaseURL = "https://github.com/" + releaseRepository + "/releases"
 	}
 	if !appUpdatesEnabled {

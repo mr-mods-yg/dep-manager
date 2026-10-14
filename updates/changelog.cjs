@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseVersion } = require('./semver.cjs');
 
 const categories = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'];
 const repository = 'https://github.com/mr-mods-yg/dep-manager';
@@ -57,7 +58,7 @@ function releaseNotes(source, version = 'Unreleased') {
 }
 
 function recordRelease(source, { version, date, branch, notes }) {
-  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error('Invalid release version');
+  try { parseVersion(version); } catch { throw new Error('Invalid release version'); }
   const parsedDate = new Date(date + 'T00:00:00Z');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
     throw new Error('Use a valid YYYY-MM-DD release date');

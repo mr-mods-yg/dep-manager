@@ -8,6 +8,17 @@ This history starts with the reset prerelease series.
 
 ## [Unreleased]
 
+### Added
+
+- A Beta option alongside Stable and Nightly for automatic and manual application updates.
+- Repository instructions in AGENTS.md for branches, semantic versioning, updates, and changelog maintenance.
+
+### Changed
+
+- Follow SemVer with a shared release target: alpha versions for Nightly, beta versions for Beta, and plain versions for Stable.
+- Number prereleases per target and channel instead of using GitHub Actions run numbers.
+- Choose compatible update releases by semantic version precedence across every release page.
+
 ## [0.0.6-nightly.8] - 2026-10-14
 
 ### Added
