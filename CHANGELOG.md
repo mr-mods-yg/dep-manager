@@ -5,7 +5,6 @@ Notable changes in DepManager are recorded here.
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The fresh development series starts at 0.0.1.
-Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-ARCHIVE.md).
 
 ## [Unreleased]
 

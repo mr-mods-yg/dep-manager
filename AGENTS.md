@@ -32,7 +32,6 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 ## Changelog and verification
 
 - Maintain `CHANGELOG.md` using [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/): one Unreleased section, newest releases first, UTC `YYYY-MM-DD` dates, comparison links, and relevant Added/Changed/Deprecated/Removed/Fixed/Security categories.
-- `CHANGELOG-ARCHIVE.md` preserves the withdrawn release series from before the `0.0.1` reset. Keep new releases in the active changelog.
 - Add human-written Unreleased notes with code changes. GitHub release notes come from this snapshot. Archive it only after successful publication, preserving notes added during the build. Failed builds leave notes pending.
 - Check release automation with `node --test updates/*.test.cjs` and actionlint. Check updater changes with `go test ./updates`, and frontend changes with `npm run build` in `frontend`.
 - In a headless environment without GTK, use `CGO_ENABLED=0 go test -tags 'server,production' ./...`. PowerShell handoff tests need `pwsh`; the Windows release job exercises them on Windows.

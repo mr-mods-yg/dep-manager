@@ -129,7 +129,6 @@ wails3 generate bindings -ts -i
 | `build/` | Platform packaging, metadata, icons, and development configuration. |
 | `.github/workflows/release.yml` | Version bump, desktop builds, checksums, and GitHub release publication. |
 | `CHANGELOG.md` | Curated pending changes and dated release history. |
-| `CHANGELOG-ARCHIVE.md` | Archived history of the withdrawn release series. |
 
 ## Releases
 
@@ -158,7 +157,7 @@ The workflow commits metadata on the selected branch, tags it, tests the updater
 
 [CHANGELOG.md](CHANGELOG.md) stores human-written release history using [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Add notable changes under `[Unreleased]`, using the relevant `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` headings. Omit empty headings.
 
-[CHANGELOG-ARCHIVE.md](CHANGELOG-ARCHIVE.md) preserves notes from the withdrawn release series. The active changelog starts with the fresh `0.0.1` cycle.
+The active changelog starts with the fresh `0.0.1` cycle and retains the release history.
 
 Code-changing releases require a nonempty Unreleased entry before the version is changed. The workflow uses those notes for the GitHub release. After successful publication it records the actual UTC publication date, updates comparison links, and commits the released entry to the release branch. Notes added while the build runs stay in Unreleased. Failed builds leave the notes pending, and changelog-only edits do not trigger version bumps or releases.
 
