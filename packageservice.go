@@ -38,8 +38,9 @@ type PackageActionResult struct {
 }
 
 type PackageService struct {
-	operations   *sync.RWMutex
-	emitProgress func(PackageActionProgress)
+	operations     *sync.RWMutex
+	pnpmOperations sync.RWMutex
+	emitProgress   func(PackageActionProgress)
 }
 
 type latestVersionCacheEntry struct {
@@ -68,16 +69,22 @@ func (s *PackageService) GetPackageManagers() []PackageManagerInfo {
 			}
 
 			manager.Installed = true
-			version, _, err := runPackageManager(name, 8*time.Second, "--version")
-			if err == nil {
-				manager.Version = strings.TrimSpace(string(version))
-			}
+			var queries sync.WaitGroup
+			queries.Add(1)
+			go func() {
+				defer queries.Done()
+				version, _, err := runPackageManager(name, 8*time.Second, "--version")
+				if err == nil {
+					manager.Version = strings.TrimSpace(string(version))
+				}
+			}()
 
 			packages, listErr := listGlobalPackages(name)
 			manager.Packages = packages
 			if listErr != nil {
 				manager.Error = listErr.Error()
 			}
+			queries.Wait()
 			managers[i] = manager
 		}(i, name)
 	}
@@ -92,6 +99,11 @@ func (s *PackageService) GetLatestPackageVersion(manager, packageName string) st
 	packageName = strings.TrimSpace(packageName)
 	if !isSupportedManager(manager) || !isValidPackageName(packageName) {
 		return ""
+	}
+	// Self-update follows pnpm's release, including standalone @pnpm/exe
+	// installations that migrate to the pnpm package in newer releases.
+	if isPnpmSelfUpdate(manager, packageName) {
+		packageName = "pnpm"
 	}
 
 	cacheKey := manager + ":" + packageName
@@ -137,6 +149,20 @@ func (s *PackageService) RunPackageAction(manager, packageName, action string) P
 	if !isSupportedManager(manager) {
 		return PackageActionResult{Message: "That package manager is not supported."}
 	}
+	selfUpdate := action == "update" && isPnpmSelfUpdate(manager, packageName)
+	if manager == "pnpm" {
+		if selfUpdate {
+			if !s.pnpmOperations.TryLock() {
+				return PackageActionResult{Message: "Wait for pnpm's current package operations to finish before updating pnpm."}
+			}
+			defer s.pnpmOperations.Unlock()
+		} else {
+			if !s.pnpmOperations.TryRLock() {
+				return PackageActionResult{Message: "pnpm is updating. Wait for its self-update to finish."}
+			}
+			defer s.pnpmOperations.RUnlock()
+		}
+	}
 	progress := func(stage string) {
 		if s.emitProgress != nil {
 			s.emitProgress(PackageActionProgress{Manager: manager, PackageName: packageName, Action: action, Stage: stage})
@@ -148,8 +174,21 @@ func (s *PackageService) RunPackageAction(manager, packageName, action string) P
 	}
 
 	args := packageActionArgs(manager, packageName, action)
+	workingDir := ""
+	if selfUpdate {
+		// In a project with a packageManager pin, self-update changes that pin
+		// instead of the global CLI. Use an empty directory for the global update.
+		var err error
+		workingDir, err = os.MkdirTemp("", "depmanager-pnpm-self-update-")
+		if err != nil {
+			return PackageActionResult{Message: "Could not prepare pnpm self-update: " + err.Error()}
+		}
+		defer os.RemoveAll(workingDir)
+	}
 	stage := "Updating"
-	if action == "remove" {
+	if selfUpdate {
+		stage = "Updating pnpm"
+	} else if action == "remove" {
 		stage = "Removing"
 	} else if manager == "npm" {
 		stage = "Installing"
@@ -158,16 +197,21 @@ func (s *PackageService) RunPackageAction(manager, packageName, action string) P
 	// Ask for readable progress even when the CLI is connected to a pipe.
 	if manager == "npm" {
 		args = append(args, "--loglevel=http")
-	} else if manager == "pnpm" {
+	} else if manager == "pnpm" && !selfUpdate {
 		args = append(args, "--reporter=append-only")
 	}
-	output, stderr, err := runPackageManagerWithProgress(manager, 10*time.Minute, progress, args...)
+	output, stderr, err := runPackageManagerInDir(manager, 10*time.Minute, progress, workingDir, args...)
 	combined := strings.TrimSpace(string(output) + "\n" + string(stderr))
 	if err != nil {
 		message := fmt.Sprintf("Could not %s %s with %s: %s", action, packageName, manager, err)
 		return PackageActionResult{Message: message, Output: truncate(combined, 6000)}
 	}
 	latestVersionCache.Delete(manager + ":" + packageName)
+	if selfUpdate {
+		latestVersionCache.Delete("pnpm:pnpm")
+		latestVersionCache.Delete("pnpm:@pnpm/exe")
+		return PackageActionResult{Success: true, Message: "Updated the pnpm package manager with pnpm self-update.", Output: truncate(combined, 6000)}
+	}
 
 	verb := "Updated"
 	if action == "remove" {
@@ -201,6 +245,10 @@ func isValidPackageName(name string) bool {
 	return true
 }
 
+func isPnpmSelfUpdate(manager, packageName string) bool {
+	return manager == "pnpm" && (packageName == "pnpm" || packageName == "@pnpm/exe")
+}
+
 func packageActionArgs(manager, packageName, action string) []string {
 	switch manager {
 	case "npm":
@@ -210,6 +258,9 @@ func packageActionArgs(manager, packageName, action string) []string {
 		return []string{"uninstall", "--global", packageName}
 	case "pnpm":
 		if action == "update" {
+			if isPnpmSelfUpdate(manager, packageName) {
+				return []string{"self-update"}
+			}
 			return []string{"update", "--global", "--latest", packageName}
 		}
 		return []string{"remove", "--global", packageName}
@@ -532,6 +583,10 @@ func runPackageManager(name string, timeout time.Duration, args ...string) ([]by
 }
 
 func runPackageManagerWithProgress(name string, timeout time.Duration, progress func(string), args ...string) ([]byte, []byte, error) {
+	return runPackageManagerInDir(name, timeout, progress, "", args...)
+}
+
+func runPackageManagerInDir(name string, timeout time.Duration, progress func(string), dir string, args ...string) ([]byte, []byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -544,6 +599,7 @@ func runPackageManagerWithProgress(name string, timeout time.Duration, progress 
 	} else {
 		command = exec.CommandContext(ctx, name, args...)
 	}
+	command.Dir = dir
 	configurePackageCommand(command)
 	var stdout, stderr bytes.Buffer
 	if progress == nil {

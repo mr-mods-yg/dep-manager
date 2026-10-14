@@ -27,6 +27,11 @@ type ActiveAction = { action: PackageAction, stage: string }
 type PackageProgress = { manager: string, packageName: string, action: PackageAction, stage: string }
 
 const managerNames = ['npm', 'pnpm', 'bun']
+const latestVersionConcurrency = 8
+
+function usesPnpmSelfUpdate(manager: string, packageName: string) {
+  return manager === 'pnpm' && (packageName === 'pnpm' || packageName === '@pnpm/exe')
+}
 
 function normalizeVersion(version: string) {
   return version.trim().replace(/^v(?=\d)/i, '')
@@ -66,6 +71,7 @@ function App() {
   const [latestVersions, setLatestVersions] = useState<Record<string, string | null | undefined>>({})
   const [notice, setNotice] = useState<Notice | null>(null)
   const latestCheckRun = useRef(0)
+  const managerLoadRun = useRef(0)
 
   useEffect(() => Events.On('package:progress', (event) => {
     const progress = event.data as PackageProgress
@@ -91,7 +97,7 @@ function App() {
 
     let nextPackage = 0
     const checkWorker = async () => {
-      while (nextPackage < packages.length) {
+      while (latestCheckRun.current === run && nextPackage < packages.length) {
         const pkg = packages[nextPackage++]
         try {
           const version = await PackageService.GetLatestPackageVersion(pkg.manager, pkg.name)
@@ -104,26 +110,37 @@ function App() {
       }
     }
 
-    await Promise.all(Array.from({ length: Math.min(4, packages.length) }, () => checkWorker()))
+    await Promise.all(Array.from({ length: Math.min(latestVersionConcurrency, packages.length) }, () => checkWorker()))
   }, [])
 
   const loadManagers = useCallback(async (showLoading = false) => {
+    const run = ++managerLoadRun.current
     if (showLoading) setLoading(true)
     setRefreshing(true)
     try {
       const data = await PackageService.GetPackageManagers()
+      if (managerLoadRun.current !== run) return
       const normalized = (data ?? []).map((manager) => ({ ...manager, packages: manager.packages ?? [] }))
       setManagers(normalized)
       void checkLatestVersions(normalized)
     } catch (error) {
+      if (managerLoadRun.current !== run) return
       setNotice({ kind: 'error', message: error instanceof Error ? error.message : 'Could not read package managers.' })
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      if (managerLoadRun.current === run) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
   }, [checkLatestVersions])
 
-  useEffect(() => { void loadManagers(true) }, [loadManagers])
+  useEffect(() => {
+    void loadManagers(true)
+    return () => {
+      ++managerLoadRun.current
+      ++latestCheckRun.current
+    }
+  }, [loadManagers])
 
   const installedManagers = useMemo(() => managers.filter((manager) => manager.installed), [managers])
   const allPackages = useMemo(() => installedManagers.flatMap((manager) => manager.packages.map((pkg) => ({ ...pkg, manager: manager.name }))), [installedManagers])
@@ -131,8 +148,15 @@ function App() {
     const query = search.trim().toLowerCase()
     return allPackages.filter((pkg) => (activeManager === 'all' || pkg.manager === activeManager) && (!query || `${pkg.name} ${pkg.version} ${pkg.manager}`.toLowerCase().includes(query)))
   }, [activeManager, allPackages, search])
+  const pnpmBusy = Object.keys(activeActions).some((key) => key.startsWith('pnpm:'))
+  const pnpmSelfUpdating = ['pnpm:pnpm', 'pnpm:@pnpm/exe'].some((key) => activeActions[key]?.action === 'update')
   const runAction = async (manager: string, pkg: GlobalPackage, action: PackageAction) => {
     if (appUpdating) return
+    const selfUpdate = usesPnpmSelfUpdate(manager, pkg.name)
+    if (manager === 'pnpm' && (pnpmSelfUpdating || (action === 'update' && selfUpdate && pnpmBusy))) return
+    if (action === 'update' && selfUpdate && !window.confirm(
+      `${pkg.name} is the pnpm package manager itself.\n\nUpdating it will run:\npnpm self-update\n\nRun this command?`,
+    )) return
     if (action === 'remove' && !window.confirm(`Remove ${pkg.name} from ${manager}'s global packages?`)) return
     const key = `${manager}:${pkg.name}`
     setActiveActions((current) => ({ ...current, [key]: { action, stage: 'Preparing' } }))
@@ -238,18 +262,24 @@ function App() {
               const latestVersion = latestVersions[key]
               const isLatest = Boolean(pkg.version && latestVersion && normalizeVersion(pkg.version) === normalizeVersion(latestVersion))
               const label = pkg.manager === 'bun' ? 'Bun' : pkg.manager
+              const selfUpdate = usesPnpmSelfUpdate(pkg.manager, pkg.name)
+              const actionsDisabled = appUpdating || Boolean(pendingAction) || (pkg.manager === 'pnpm' && pnpmSelfUpdating)
+              const updateDisabled = actionsDisabled || (selfUpdate && pnpmBusy)
               return (
                 <div className="package-row" key={key} aria-busy={Boolean(pendingAction)}>
-                  <span className="package-name">{pkg.name}</span>
+                  <span className="package-name">
+                    <span>{pkg.name}</span>
+                    {selfUpdate && <small title="Updates the pnpm package manager using pnpm self-update">pnpm package manager · Uses pnpm self-update</small>}
+                  </span>
                   <span className="package-manager"><i className={`manager-dot manager-${pkg.manager}`} />{label}</span>
-                  <span className={`package-version ${!pkg.version ? 'package-version-missing' : ''}`} title={!pkg.version ? 'The installed version could not be read. Repair reinstalls the latest version.' : undefined}>{pkg.version || 'Incomplete install'}</span>
+                  <span className={`package-version ${!pkg.version ? 'package-version-missing' : ''}`} title={!pkg.version ? selfUpdate ? 'The installed version could not be read. Self-update updates the pnpm package manager.' : 'The installed version could not be read. Repair reinstalls the latest version.' : undefined}>{pkg.version || 'Incomplete install'}</span>
                   <div className="row-actions">
                     {pendingAction ? (
                       <span className="action-progress" role="status" aria-label={`${pkg.name}: ${pendingAction.stage}`}>
                         <span className="loading-spinner action-spinner" aria-hidden="true" />{pendingAction.stage}
                       </span>
                     ) : !pkg.version ? (
-                      <button className="update-button" onClick={() => void runAction(pkg.manager, pkg, 'update')} disabled={Boolean(pendingAction) || appUpdating}>Repair</button>
+                      <button className="update-button" onClick={() => void runAction(pkg.manager, pkg, 'update')} disabled={updateDisabled}>{selfUpdate ? 'Self-update' : 'Repair'}</button>
                     ) : latestVersion === undefined ? (
                       <button className="update-button" disabled>Checking</button>
                     ) : latestVersion === null ? (
@@ -257,9 +287,9 @@ function App() {
                     ) : isLatest ? (
                       <span className="latest-status" title={`Latest version ${latestVersion}`}><Icon name="check" />Latest</span>
                     ) : (
-                      <button className="update-button" onClick={() => void runAction(pkg.manager, pkg, 'update')} disabled={Boolean(pendingAction) || appUpdating}>Update</button>
+                      <button className="update-button" onClick={() => void runAction(pkg.manager, pkg, 'update')} disabled={updateDisabled}>{selfUpdate ? 'Self-update' : 'Update'}</button>
                     )}
-                    {!pendingAction && <button className="delete-button" onClick={() => void runAction(pkg.manager, pkg, 'remove')} disabled={appUpdating} aria-label={`Delete ${pkg.name}`} title="Delete package">
+                    {!pendingAction && <button className="delete-button" onClick={() => void runAction(pkg.manager, pkg, 'remove')} disabled={actionsDisabled} aria-label={`Delete ${pkg.name}`} title="Delete package">
                       <Icon name="trash" />
                     </button>}
                   </div>

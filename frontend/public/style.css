@@ -82,7 +82,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8795eb; outline-
 .package-row { min-height: 68px; border-bottom: 1px solid #f0f1f4; transition: background .15s; }
 .package-row:last-child { border-bottom: 0; }
 .package-row:hover { background: #fcfcfe; }
-.package-name { overflow: hidden; color: #303744; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.package-name { min-width: 0; display: flex; flex-direction: column; gap: 5px; overflow: hidden; color: #303744; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.package-name > span, .package-name > small { overflow: hidden; text-overflow: ellipsis; }
+.package-name > small { color: var(--muted); font-size: 11px; font-weight: 400; }
 .package-manager { display: inline-flex; align-items: center; gap: 9px; color: #697382; font-size: 12px; }
 .package-version { color: #626d7b; font: 12px 'Cascadia Code', Consolas, monospace; }
 .package-version-missing { color: #98703a; font: 11px 'Segoe UI', sans-serif; }

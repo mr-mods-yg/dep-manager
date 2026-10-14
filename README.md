@@ -29,6 +29,10 @@ Use **Refresh** to rescan installed managers and packages. **Update** asks the s
 
 Installed versions come from the manager's package list. If npm or pnpm omits a version, DepManager checks that package's local `package.json` in the global installation directory. It never uses a registry version as a substitute for an installed version.
 
+When pnpm lists `pnpm` or `@pnpm/exe` among its own global packages, the row identifies it as the pnpm package manager. **Self-update** explains the command and asks for confirmation before running [`pnpm self-update`](https://pnpm.io/cli/self-update). The command runs outside a project directory so it updates the global manager, and other pnpm changes wait until it finishes.
+
+Manager versions and global package lists are fetched concurrently. Registry checks use up to eight concurrent queries and show results as they arrive.
+
 If the installed version still cannot be read, the row shows **Incomplete install** and offers **Repair**. For npm, repair runs `npm install --global <package>@latest`; this reinstalls the package and its manifest. An interrupted install can leave a package folder without a `package.json`, which is why a version may be unavailable.
 
 Bun packages are read from its configured global directory, including `BUN_INSTALL` and `bunfig.toml` settings. Package aliases retain their installed dependency name so actions target the correct entry.
