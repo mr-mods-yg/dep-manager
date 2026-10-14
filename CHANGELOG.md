@@ -9,6 +9,14 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 
 ## [Unreleased]
 
+### Added
+
+- Identify pnpm's own global package and ask before updating it with `pnpm self-update`.
+
+### Changed
+
+- Fetch manager versions and global package lists concurrently, and check up to eight latest package versions at a time.
+
 ## [0.0.2-alpha.1] - 2026-10-14
 
 ### Fixed
