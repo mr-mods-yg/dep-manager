@@ -32,10 +32,8 @@ func installAppUpdate(ctx context.Context, installer, executable string) error {
 	}
 	readyFile := script.Name() + ".ready"
 	defer os.Remove(readyFile)
-	powershell := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
-	command := exec.Command(powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script.Name(),
+	command := windowsUpdateCommand(script.Name(),
 		"-Installer", installer, "-Executable", executable, "-AppProcessId", strconv.Itoa(os.Getpid()), "-ErrorFile", updateErrorPath(), "-ReadyFile", readyFile)
-	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x00000200 | 0x00000008}
 	if err = command.Start(); err != nil {
 		return err
 	}
@@ -53,4 +51,18 @@ func installAppUpdate(ctx context.Context, installer, executable string) error {
 	}
 	handedOff = true
 	return nil
+}
+
+func windowsUpdateCommand(script string, args ...string) *exec.Cmd {
+	powershell := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+	command := exec.Command(powershell, append([]string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script}, args...)...)
+	const (
+		createNewProcessGroup = 0x00000200
+		createNoWindow        = 0x08000000
+	)
+	// Windows PowerShell exits without running the script with DETACHED_PROCESS
+	// and null standard handles. CREATE_NO_WINDOW runs it without a console;
+	// the separate process group lets the helper continue after app shutdown.
+	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNewProcessGroup | createNoWindow}
+	return command
 }

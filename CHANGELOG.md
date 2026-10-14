@@ -9,6 +9,10 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 
 ## [Unreleased]
 
+### Fixed
+
+- Start the Windows update helper without a console window so PowerShell runs the installer script instead of exiting before it is ready.
+
 ## [0.0.1] - 2026-10-14
 
 ### Added
