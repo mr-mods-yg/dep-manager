@@ -125,6 +125,7 @@ wails3 generate bindings -ts -i
 | `build/` | Platform packaging, metadata, icons, and development configuration. |
 | `.github/workflows/release.yml` | Version bump, desktop builds, checksums, and GitHub release publication. |
 | `CHANGELOG.md` | Curated pending changes and dated release history. |
+| `CHANGELOG-ARCHIVE.md` | Archived history of the withdrawn release series. |
 
 ## Releases
 
@@ -136,13 +137,13 @@ Releases follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)
 
 | Channel | Branch | Example version |
 | --- | --- | --- |
-| Nightly | `nightly` | `0.1.0-alpha.1`, `0.1.0-alpha.2` |
-| Beta | `beta` | `0.1.0-beta.1`, `0.1.0-beta.2` |
-| Stable | `main` | `0.1.0` |
+| Nightly | `nightly` | `0.0.1-alpha.1`, `0.0.1-alpha.2` |
+| Beta | `beta` | `0.0.1-beta.1`, `0.0.1-beta.2` |
+| Stable | `main` | `0.0.1` |
 
 Nightly uses the `alpha` identifier because SemVer orders `alpha` before `beta`; the channel remains named Nightly. All stages keep the same numeric target. Prerelease counters are independent per target/channel and come from reserved tags, rather than workflow run numbers. A new target starts its counters at 1. A failed tagged build reserves its counter, while skipped runs do not consume one. Existing published nightly versions keep their original names and remain recognized by the updater.
 
-The initial development target is `0.1.0`. During initial development, use `0.1.1` for fixes and `0.2.0` for features or breaking development changes. The Stable channel identifies a release without a prerelease suffix; major-zero releases still have a development API. Publishing from main does not automatically advance to `1.0.0`. Make that transition deliberately when the app and its compatibility contract are ready.
+The fresh development series starts at `0.0.1`. Keep that base fixed while iterating on its alpha and beta builds. The next nightly after `0.0.1-alpha.1` is `0.0.1-alpha.2`; a later release cycle can target `0.0.2` and restart its counters at 1. For new functionality or breaking development changes, explicitly choose the next minor target, such as `0.1.0`. The Stable channel identifies a release without a prerelease suffix; major-zero releases still have a development API. Publishing from main does not automatically advance to `1.0.0`. Make that transition deliberately when the app and its compatibility contract are ready.
 
 After reaching `1.0.0`, use PATCH for compatible fixes, MINOR for compatible features or deprecations, and MAJOR for incompatible changes. Reset lower components to zero when increasing a higher component. Version targets are explicit because a build script cannot determine whether a change breaks compatibility. Changing the plan alone does not publish a release, and a published stable target cannot be reused.
 
@@ -154,8 +155,10 @@ The workflow commits metadata on the selected branch, tags it, tests the updater
 
 [CHANGELOG.md](CHANGELOG.md) stores human-written release history using [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Add notable changes under `[Unreleased]`, using the relevant `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` headings. Omit empty headings.
 
+[CHANGELOG-ARCHIVE.md](CHANGELOG-ARCHIVE.md) preserves notes from the withdrawn release series. The active changelog starts with the fresh `0.0.1` cycle.
+
 Code-changing releases require a nonempty Unreleased entry before the version is changed. The workflow uses those notes for the GitHub release. After successful publication it records the actual UTC publication date, updates comparison links, and commits the released entry to the release branch. Notes added while the build runs stay in Unreleased. Failed builds leave the notes pending, and changelog-only edits do not trigger version bumps or releases.
 
-The workflow can also be run manually against `nightly`; the same code-change check applies. It compares with a published release, so a failed build can be retried. Install the first nightly manually to switch from a stable installation to prerelease updates. Existing installations with the old `1.0.x` numbering, including the withdrawn `1.0.0-alpha.1`, require a manual install to move to this major-zero version series because automatic updates do not downgrade.
+The workflow can also be run manually against `nightly`; the same code-change check applies. It compares with a published release, so a failed build can be retried. Existing installations from the withdrawn release series need a manual install to move to the fresh `0.0.1` series because automatic updates do not downgrade.
 
 The app embeds its version from `frontend/package.json`, keeping update comparisons aligned with release tags. Older installed versions that predate the in-app updater need a manual upgrade to a release containing this feature first.
