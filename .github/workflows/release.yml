@@ -1,52 +1,76 @@
-name: Build and release desktop apps
+name: Build and release nightly apps
 
 on:
   push:
-    branches: [main]
+    branches: [nightly]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: desktop-release-main
+  group: desktop-release-nightly
   cancel-in-progress: false
 
 jobs:
   version:
-    if: github.actor != 'github-actions[bot]'
+    if: github.ref == 'refs/heads/nightly' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     outputs:
+      changed: ${{ steps.changes.outputs.changed }}
       version: ${{ steps.bump.outputs.version }}
       commit: ${{ steps.bump.outputs.commit }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: nightly
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      - name: Bump patch version and tag the release
-        id: bump
+      - name: Test release scripts
+        run: node --test updates/*.test.cjs
+
+      - name: Check for code changes since the last published nightly
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          git fetch origin main
-          git checkout -B main origin/main
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate \
+            --jq '.[] | select(.draft == false and .prerelease == true) | select(.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-nightly\\.")) | .tag_name' \
+            > "${RUNNER_TEMP}/nightly-release-tags.txt"
+          baseline="$(sed -n '1p' "${RUNNER_TEMP}/nightly-release-tags.txt")"
+          if [ -z "${baseline}" ]; then
+            baseline="$(git tag --list 'v*' --sort=-version:refname | sed -n '/^v[0-9]*\.[0-9]*\.[0-9]*$/p' | sed -n '1p')"
+          fi
+          changed="$(node updates/has-code-changes.cjs "${baseline}" HEAD)"
+          echo "changed=${changed}" >> "$GITHUB_OUTPUT"
+          if [ "${changed}" = "false" ]; then
+            echo "No code changes since ${baseline}; version bump and release skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-          version="$(node updates/bump-version.cjs)"
+      - name: Bump nightly version and tag the release
+        id: bump
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          version="$(node updates/bump-version.cjs --nightly "${GITHUB_RUN_NUMBER}")"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add build/config.yml build/windows/info.json build/linux/nfpm/nfpm.yaml frontend/package.json frontend/package-lock.json
+          git add build/config.yml build/windows/info.json build/windows/nsis/wails_tools.nsh build/linux/nfpm/nfpm.yaml frontend/package.json frontend/package-lock.json
           git commit -m "chore(release): v${version} [skip ci]"
           git tag "v${version}"
-          git push origin main "refs/tags/v${version}"
+          git push --atomic origin HEAD:nightly "refs/tags/v${version}"
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
     needs: version
+    if: needs.version.outputs.changed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -104,13 +128,20 @@ jobs:
             $nsisPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           }
 
+      - name: Test application updater
+        run: go test ./updates
+
       - name: Build Windows installer
         if: matrix.platform == 'windows'
         run: wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=user
 
       - name: Build Linux Debian package
         if: matrix.platform == 'linux'
-        run: wails3 task linux:create:deb ARCH=amd64
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          wails3 task linux:create:deb ARCH=amd64
+          mv bin/depmanager.deb "bin/depmanager_${VERSION}_amd64.deb"
 
       - name: Upload Windows release asset
         if: matrix.platform == 'windows'
@@ -138,7 +169,7 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Publish GitHub Release
+      - name: Publish GitHub prerelease
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.version.outputs.version }}
@@ -146,6 +177,8 @@ jobs:
           (cd release-assets && sha256sum *.exe *.deb > SHA256SUMS)
           gh release create "v${VERSION}" release-assets/* \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "DepManager v${VERSION}" \
+            --title "DepManager Nightly v${VERSION}" \
+            --prerelease \
+            --latest=false \
             --generate-notes \
             --verify-tag
