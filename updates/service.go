@@ -64,12 +64,21 @@ func (p verifiedProvider) Check(ctx context.Context, req updater.CheckRequest) (
 	return release, nil
 }
 
-func Configure(s *Service, runtimeUpdater *updater.Updater, quit func()) error {
-	provider, err := githubprovider.New(githubprovider.Config{
+func releaseProviderConfig(version string) githubprovider.Config {
+	return githubprovider.Config{
 		Repository:    releaseRepository,
 		ChecksumAsset: "SHA256SUMS",
 		AssetMatcher:  matchUpdateAsset,
-	})
+		Prerelease:    isNightlyVersion(version),
+	}
+}
+
+func isNightlyVersion(version string) bool {
+	return strings.Contains(version, "-nightly.")
+}
+
+func Configure(s *Service, runtimeUpdater *updater.Updater, quit func()) error {
+	provider, err := githubprovider.New(releaseProviderConfig(s.version))
 	if err != nil {
 		return err
 	}
@@ -110,6 +119,10 @@ func (s *Service) GetAppInfo() AppUpdateInfo {
 		Message:          "Checks GitHub for the latest stable release.",
 		ReleaseURL:       "https://github.com/" + releaseRepository + "/releases/latest",
 	}
+	if isNightlyVersion(s.version) {
+		info.Message = "Checks GitHub for the latest nightly prerelease."
+		info.ReleaseURL = "https://github.com/" + releaseRepository + "/releases"
+	}
 	if !appUpdatesEnabled {
 		info.Message = "Development build: updates can be checked, but installation is disabled."
 	} else if !info.CanInstall {
@@ -141,6 +154,9 @@ func (s *Service) CheckForUpdates() (AppUpdateInfo, error) {
 		info.LatestVersion = release.Version
 		info.Available = true
 		info.Message = "DepManager " + release.Version + " is available."
+		if url, ok := release.Metadata["github.release.htmlURL"].(string); ok && url != "" {
+			info.ReleaseURL = url
+		}
 	}
 	if !info.CanInstall && !appUpdatesEnabled {
 		info.Message += " Automatic installation is disabled in development builds."

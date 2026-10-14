@@ -50,17 +50,21 @@ func TestAssetSelection(t *testing.T) {
 
 // Exercise the real GitHub provider, checksum parser, downloader, and service
 // against a local release. The installer is replaced so tests cannot update apps.
-func fixtureService(t *testing.T, version, checksum string, status int) (*Service, []byte) {
+func fixtureService(t *testing.T, version, checksum string, status int, currentVersions ...string) (*Service, []byte) {
 	t.Helper()
+	currentVersion := "1.0.0"
+	if len(currentVersions) > 0 {
+		currentVersion = currentVersions[0]
+	}
 	payload := []byte("a verified test installer")
-	filename := "depmanager-amd64-installer.exe"
+	filename := "depmanager-" + runtime.GOARCH + "-installer.exe"
 	if runtime.GOOS == "linux" {
-		filename = "depmanager_1.1.0_amd64.deb"
+		filename = "depmanager_1.1.0_" + runtime.GOARCH + ".deb"
 	}
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/" + releaseRepository + "/releases/latest":
+		case "/repos/" + releaseRepository + "/releases/latest", "/repos/" + releaseRepository + "/releases":
 			if status != 200 {
 				w.WriteHeader(status)
 				return
@@ -69,7 +73,17 @@ func fixtureService(t *testing.T, version, checksum string, status int) (*Servic
 			if checksum != "missing" {
 				assets = append(assets, map[string]any{"name": "SHA256SUMS", "browser_download_url": server.URL + "/checksums"})
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"tag_name": version, "assets": assets})
+			release := map[string]any{"tag_name": version, "assets": assets, "html_url": server.URL + "/release", "prerelease": isNightlyVersion(version)}
+			if strings.HasSuffix(r.URL.Path, "/latest") {
+				if isNightlyVersion(version) {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				_ = json.NewEncoder(w).Encode(release)
+			} else {
+				// Drafts must never be installed, even if listed before a nightly.
+				_ = json.NewEncoder(w).Encode([]map[string]any{{"tag_name": "v99.0.0", "draft": true}, release})
+			}
 		case "/checksums":
 			if checksum == "valid" {
 				sum := sha256.Sum256(payload)
@@ -83,11 +97,13 @@ func fixtureService(t *testing.T, version, checksum string, status int) (*Servic
 		}
 	}))
 	t.Cleanup(server.Close)
-	provider, err := githubprovider.New(githubprovider.Config{Repository: releaseRepository, BaseURL: server.URL, ChecksumAsset: "SHA256SUMS", AssetMatcher: matchUpdateAsset})
+	config := releaseProviderConfig(currentVersion)
+	config.BaseURL = server.URL
+	provider, err := githubprovider.New(config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := New("1.0.0", &sync.RWMutex{})
+	s := New(currentVersion, &sync.RWMutex{})
 	s.canInstall = true
 	s.updater = updater.New(testHost{})
 	if err := s.updater.Init(updater.Config{CurrentVersion: s.version, Providers: []updater.Provider{verifiedProvider{provider}}, Window: updater.WindowNone}); err != nil {
@@ -127,6 +143,33 @@ func TestCheckReleases(t *testing.T) {
 			}
 			if info.Available != test.available || info.CurrentVersion != "1.0.0" {
 				t.Fatalf("unexpected info: %+v", info)
+			}
+		})
+	}
+}
+
+func TestNightlyReleaseChecks(t *testing.T) {
+	for _, test := range []struct {
+		name, current, latest string
+		available             bool
+	}{
+		{"new nightly", "1.0.4-nightly.1", "v1.0.5-nightly.2", true},
+		{"same nightly", "1.0.4-nightly.1", "v1.0.4-nightly.1", false},
+		{"older nightly", "1.0.5-nightly.2", "v1.0.4-nightly.1", false},
+		{"stable promotion", "1.0.4-nightly.1", "v1.0.4", true},
+		{"stable ignores nightly", "1.0.3", "v1.0.4-nightly.1", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			s, _ := fixtureService(t, test.latest, "valid", 200, test.current)
+			info, err := s.CheckForUpdates()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if info.Available != test.available {
+				t.Fatalf("unexpected availability: %+v", info)
+			}
+			if test.available && !strings.HasSuffix(info.ReleaseURL, "/release") {
+				t.Fatalf("missing link to the selected release: %s", info.ReleaseURL)
 			}
 		})
 	}
