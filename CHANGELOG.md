@@ -9,6 +9,8 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 
 ## [Unreleased]
 
+## [0.0.1-alpha.2] - 2026-10-14
+
 ### Removed
 
 - The Beta branch, release channel, and update selector option. Releases now progress directly from Nightly to Stable on main.
@@ -33,5 +35,6 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 - Keep the application open if the Windows update helper cannot start and reopen it visibly after installation.
 - Preserve installation and restart errors for the next launch and clear stale update offers on channel changes.
 
-[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.1-alpha.1...nightly
+[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.1-alpha.2...nightly
+[0.0.1-alpha.2]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.1-alpha.1...v0.0.1-alpha.2
 [0.0.1-alpha.1]: https://github.com/mr-mods-yg/dep-manager/releases/tag/v0.0.1-alpha.1
