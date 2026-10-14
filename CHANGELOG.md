@@ -8,6 +8,8 @@ This history starts with the reset prerelease series.
 
 ## [Unreleased]
 
+## [1.0.0-alpha.1] - 2026-10-14
+
 ### Added
 
 - A Beta option alongside Stable and Nightly for automatic and manual application updates.
@@ -51,6 +53,7 @@ This history starts with the reset prerelease series.
 - Preserve installation and restart errors for the next application launch.
 - Clear the previous update offer when switching update channels.
 
-[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.6-nightly.8...nightly
+[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v1.0.0-alpha.1...nightly
+[1.0.0-alpha.1]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.6-nightly.8...v1.0.0-alpha.1
 [0.0.6-nightly.8]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.5-nightly.5...v0.0.6-nightly.8
 [0.0.5-nightly.5]: https://github.com/mr-mods-yg/dep-manager/releases/tag/v0.0.5-nightly.5
