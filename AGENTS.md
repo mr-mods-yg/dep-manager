@@ -11,8 +11,8 @@
 
 Follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
-- `updates/release-plan.json` declares the next target as plain `MAJOR.MINOR.PATCH`. The initial development target is `0.1.0`.
-- All stages of one release use the same target: Nightly `0.1.0-alpha.1`, Beta `0.1.0-beta.1`, Stable `0.1.0`.
+- `updates/release-plan.json` declares the next target as plain `MAJOR.MINOR.PATCH`. The fresh development series starts at `0.0.1`.
+- All stages of one release use the same target: Nightly `0.0.1-alpha.1`, Beta `0.0.1-beta.1`, Stable `0.0.1`. Keep the base fixed while iterating: the next nightly is `0.0.1-alpha.2`, not `0.0.2-alpha.1`. A later release cycle can target `0.0.2` and restart its prerelease counters at 1.
 - Keep MAJOR at zero during initial development. Publishing from main removes the prerelease suffix; it must not force the version to `1.0.0`. Establish `1.0.0` deliberately when the app and its compatibility contract are ready.
 - The Nightly channel uses `alpha` in version identifiers because SemVer sorts it before `beta`. Retain the name Nightly in the app, branch, and GitHub release titles.
 - Increment PATCH for compatible bug fixes, MINOR for compatible features or deprecations, and MAJOR for incompatible public behavior/API changes. Reset lower components when increasing a higher component. Choose the target explicitly; do not infer semantic impact from the branch name or workflow run count.
@@ -33,6 +33,7 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 ## Changelog and verification
 
 - Maintain `CHANGELOG.md` using [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/): one Unreleased section, newest releases first, UTC `YYYY-MM-DD` dates, comparison links, and relevant Added/Changed/Deprecated/Removed/Fixed/Security categories.
+- `CHANGELOG-ARCHIVE.md` preserves the withdrawn release series from before the `0.0.1` reset. Keep new releases in the active changelog.
 - Add human-written Unreleased notes with code changes. GitHub release notes come from this snapshot. Archive it only after successful publication, preserving notes added during the build. Failed builds leave notes pending.
 - Check release automation with `node --test updates/*.test.cjs` and actionlint. Check updater changes with `go test ./updates`, and frontend changes with `npm run build` in `frontend`.
 - In a headless environment without GTK, use `CGO_ENABLED=0 go test -tags 'server,production' ./...`. PowerShell handoff tests need `pwsh`; the Windows release job exercises them on Windows.
