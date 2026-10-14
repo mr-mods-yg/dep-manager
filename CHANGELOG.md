@@ -9,6 +9,8 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 
 ## [Unreleased]
 
+## [0.0.1-alpha.1] - 2026-10-14
+
 ### Added
 
 - Manage global JavaScript packages with package updates, repairs, removals, and live progress.
@@ -27,4 +29,5 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 - Keep the application open if the Windows update helper cannot start and reopen it visibly after installation.
 - Preserve installation and restart errors for the next launch and clear stale update offers on channel changes.
 
-[Unreleased]: https://github.com/mr-mods-yg/dep-manager/tree/nightly
+[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.1-alpha.1...nightly
+[0.0.1-alpha.1]: https://github.com/mr-mods-yg/dep-manager/releases/tag/v0.0.1-alpha.1
