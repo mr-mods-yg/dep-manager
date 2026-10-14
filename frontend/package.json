@@ -1,7 +1,7 @@
 {
   "name": "depmanager",
   "private": true,
-  "version": "0.0.4-nightly.0",
+  "version": "0.0.5-nightly.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
