@@ -9,6 +9,8 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 
 ## [Unreleased]
 
+## [0.0.3-alpha.1] - 2026-10-14
+
 ### Changed
 
 - Organize package manager services, command helpers, progress handling, and tests under `packages/`.
@@ -93,7 +95,8 @@ Earlier withdrawn releases are documented in [CHANGELOG-ARCHIVE.md](CHANGELOG-AR
 - Keep the application open if the Windows update helper cannot start and reopen it visibly after installation.
 - Preserve installation and restart errors for the next launch and clear stale update offers on channel changes.
 
-[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.2...nightly
+[Unreleased]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.3-alpha.1...nightly
+[0.0.3-alpha.1]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.2...v0.0.3-alpha.1
 [0.0.2]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.2-alpha.2...v0.0.2
 [0.0.2-alpha.2]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.2-alpha.1...v0.0.2-alpha.2
 [0.0.2-alpha.1]: https://github.com/mr-mods-yg/dep-manager/compare/v0.0.1...v0.0.2-alpha.1
