@@ -14,10 +14,11 @@ concurrency:
 
 jobs:
   version:
-    if: contains(fromJSON('["nightly", "beta", "stable"]'), github.ref_name) && github.actor != 'github-actions[bot]'
+    if: contains(fromJSON('["nightly", "beta", "main"]'), github.ref_name) && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     env:
-      CHANNEL: ${{ github.ref_name }}
+      CHANNEL: ${{ github.ref_name == 'main' && 'stable' || github.ref_name }}
+      RELEASE_BRANCH: ${{ github.ref_name }}
     outputs:
       changed: ${{ steps.changes.outputs.changed }}
       version: ${{ steps.bump.outputs.version }}
@@ -57,6 +58,10 @@ jobs:
             echo "No code changes since ${baseline}; version bump and release skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Validate curated release notes
+        if: steps.changes.outputs.changed == 'true'
+        run: node updates/changelog.cjs notes > "${RUNNER_TEMP}/release-notes.md"
+
       - name: Set channel version and tag the release
         id: bump
         if: steps.changes.outputs.changed == 'true'
@@ -66,9 +71,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add build/config.yml build/windows/info.json build/windows/nsis/wails_tools.nsh build/linux/nfpm/nfpm.yaml frontend/package.json frontend/package-lock.json
-          git commit -m "chore(release): v${version} [skip ci]"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): v${version} [skip ci]"
+          fi
           git tag "v${version}"
-          git push --atomic origin "HEAD:${CHANNEL}" "refs/tags/v${version}"
+          git push --atomic origin "HEAD:${RELEASE_BRANCH}" "refs/tags/v${version}"
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -168,17 +175,28 @@ jobs:
     needs: [version, build]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.commit }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
           path: release-assets
           merge-multiple: true
 
+      - name: Read curated release notes
+        run: node updates/changelog.cjs notes > "${RUNNER_TEMP}/release-notes.md"
+
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.version.outputs.version }}
-          CHANNEL: ${{ github.ref_name }}
+          CHANNEL: ${{ github.ref_name == 'main' && 'stable' || github.ref_name }}
         run: |
           (cd release-assets && sha256sum *.exe *.deb > SHA256SUMS)
           release_flags=(--prerelease --latest=false)
@@ -189,5 +207,32 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --title "DepManager ${CHANNEL^} v${VERSION}" \
             "${release_flags[@]}" \
-            --generate-notes \
+            --notes-file "${RUNNER_TEMP}/release-notes.md" \
             --verify-tag
+
+      - name: Record the published release in CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          release_date="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v${VERSION}" --jq '.published_at[0:10]')"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          recorded=false
+          for attempt in 1 2 3; do
+            git fetch origin "${RELEASE_BRANCH}"
+            git checkout -B "${RELEASE_BRANCH}" "origin/${RELEASE_BRANCH}"
+            node updates/changelog.cjs record "${VERSION}" "${release_date}" "${RELEASE_BRANCH}" "${RUNNER_TEMP}/release-notes.md"
+            git add CHANGELOG.md
+            if git diff --cached --quiet; then
+              recorded=true
+              break
+            fi
+            git commit -m "docs(changelog): v${VERSION} [skip ci]"
+            if git push origin "HEAD:${RELEASE_BRANCH}"; then
+              recorded=true
+              break
+            fi
+          done
+          [ "${recorded}" = "true" ]
